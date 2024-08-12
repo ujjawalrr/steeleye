@@ -3,3 +3,8 @@ uvicorn
 python-dotenv
 sqlalchemy 
 pymysql
+opencv-python
+numpy
+imutils
+ultralytics
+scipy
