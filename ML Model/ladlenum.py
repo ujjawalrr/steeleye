@@ -1,5 +1,3 @@
-# Import essential libraries
-#import requests
 import cv2
 import numpy as np
 import imutils
@@ -18,21 +16,7 @@ mongouri = "mongodb://localhost:27017"
 client = MongoClient(mongouri, server_api=ServerApi('1'))
 db = client['test']
 collection = db['camerafeeds']
-# document = {
-#     'name': 'John Doe',
-#     'email': 'john.doe@example.com',
-#     'age': 30
-# }
 
-# Insert the document into the collection
-# Send a ping to confirm a successful connection
-# try:
-#     # client.admin.command('ping')
-#     result = collection.insert_one(document)
-#
-#     print("Pinged your deployment. You successfully connected to MongoDB!")
-# except Exception as e:
-#     print("Error connecting mongo db: ", e)
 # Replace the below URL with your own. Make sure to add "/shot.jpg" at last.
 #url = "http://192.168.95.171:8080/shot.jpg"
 fieldnames = ['detected_ladle_number', 'timestamp','location']
