@@ -13,3 +13,9 @@ class CameraFeed(Base):
     id = Column(Integer, primary_key=True, index=True)
     cameraId = Column(String(255), index=True)
     ladleId = Column(String(255), index=True)
+    
+# class SmsUnit(Base):
+#     __tablename__ = "smsunits"
+#     id = Column(Integer, primary_key=True, index=True)
+#     cameraId = Column(String(255), index=True)
+#     ladleId = Column(String(255), index=True)
