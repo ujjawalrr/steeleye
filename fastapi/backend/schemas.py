@@ -13,17 +13,3 @@ class CameraFeed(CameraFeedBase):
     class Config:
         from_attributes = True
 
-
-# class TodoItemBase(BaseModel):
-#     title: str
-#     description: str | None = None
-#     completed: bool = False
-
-# class TodoItemCreate(TodoItemBase):
-#     pass
-
-# class TodoItem(TodoItemBase):
-#     id: int
-
-#     class Config:
-#         from_attributes = True

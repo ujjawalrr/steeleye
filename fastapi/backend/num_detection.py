@@ -67,12 +67,14 @@ def model(img):
         return img
 
 # cap = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.2:554/stream1')
-cap1=cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.2:554/stream1')
-cap2 = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.3:554/stream1')
-
+# cap1 = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.2:554/stream1')
+# cap2 = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.3:554/stream1')
+cap1 = cv2.VideoCapture(0)
+cap2 = cv2.VideoCapture('http://192.168.116.223:8080/video')
 c = 1
 # While loop to continuously fetching data from the Url
-num_list=[]
+num_list1 = []
+num_list2 = []
 while True:
 
     ret1, frame1 = cap1.read(0)
@@ -86,11 +88,10 @@ while True:
         img2_1,num1 = model(img2_1)
         img2_2,num2 = model(img2_2)
         cameraIds = [1, 2]
-
-        print('number mode', int(num1))
-        print('number mode', int(num2))
-        num_list.append(num1)
-        num_list.append(num2)
+        num_list1.append(num1)
+        num_list2.append(num2)
+        print('num1',num1)
+        print('num2',num2)
     position = (10, 50)
     cv2.putText(
         img2_1,  # numpy array on which text is written
@@ -113,9 +114,17 @@ while True:
     c+=1
     # print('Number in each frame',num)
 
-    if len(num_list)%10==0:
-        num_mode=stats.mode(num_list)
-        num_list=[]
+    if len(num_list1)%10==0:
+        num_mode1 = stats.mode(num_list1)
+        num_list1=[]
+        print('number mode1', num_mode1)
+        # print('number mode', int(num_mode1))
+        
+    if len(num_list2)%10==0:    
+        num_mode2 = stats.mode(num_list2)
+        num_list2=[]
+        print('number mode2', num_mode2)
+        # print('number mode', int(num_mode2))
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         cv2.destroyAllWindows()
