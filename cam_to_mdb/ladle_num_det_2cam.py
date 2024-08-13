@@ -118,7 +118,7 @@ def model(img,ct):
         return img
 
 # cap = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.2:554/stream1')
-cap1=cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.2:554/stream1')
+cap1 = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.2:554/stream1')
 cap2 = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.3:554/stream1')
 
 ct = 1
