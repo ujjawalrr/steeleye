@@ -70,7 +70,7 @@ def model(img):
 # cap1 = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.2:554/stream1')
 # cap2 = cv2.VideoCapture('rtsp://adminp:adminp@192.168.0.3:554/stream1')
 cap1 = cv2.VideoCapture(0)
-cap2 = cv2.VideoCapture('http://192.168.116.223:8080/video')
+cap2 = cv2.VideoCapture('http://192.168.1.173:8080/video')
 c = 1
 # While loop to continuously fetching data from the Url
 num_list1 = []

@@ -3,6 +3,13 @@ from pydantic import BaseModel
 class CameraFeedBase(BaseModel):
     cameraId: str
     ladleId: str
+    
+class SmsUnitBase(BaseModel):
+    unitId: str
+
+class LadleBase(BaseModel):
+    unitId: str
+    ladleId: str
 
 class CameraFeedCreate(CameraFeedBase):
     pass
@@ -13,9 +20,6 @@ class CameraFeed(CameraFeedBase):
     class Config:
         from_attributes = True
 
-class SmsUnitBase(BaseModel):
-    unitId: str
-
 class SmsUnitCreate(SmsUnitBase):
     pass
 
@@ -24,10 +28,6 @@ class SmsUnit(SmsUnitBase):
 
     class Config:
         from_attributes = True
-
-class LadleBase(BaseModel):
-    unitId: str
-    ladleId: str
 
 class LadleCreate(LadleBase):
     pass
