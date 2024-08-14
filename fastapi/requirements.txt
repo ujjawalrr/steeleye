@@ -6,5 +6,5 @@ pymysql
 opencv-python
 numpy
 imutils
-ultralytics
+ultralytics==8.0.228
 scipy
