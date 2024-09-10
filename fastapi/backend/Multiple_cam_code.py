@@ -3,6 +3,53 @@ import numpy as np
 import imutils
 from ultralytics import YOLO
 import statistics as stats
+import pymysql
+from pymysql import OperationalError
+from datetime import datetime
+# connection = pymysql.connect(
+        #     host='localhost',
+        #     database='test',
+        #     user='prudhvi',
+        #     password='prudhvi'
+        # )
+def insert_number_into_db(camera_url, detected_number):
+    try:
+        connection = pymysql.connect(
+            host='localhost',
+            database='steeleye',
+            user='ujjawal',
+            password='ujjawal#25012002'
+        )
+        
+        with connection.cursor() as cursor:
+            get_query = """SELECT * FROM camerafeeds WHERE camera_url = %s"""
+            cursor.execute(get_query, (camera_url))
+            results = cursor.fetchall()
+            ladle_id = results[0][2]
+            unit_id = results[0][5]
+            camera_id = results[0][1]
+            print(results[0])
+            if str(ladle_id) != str(detected_number):
+                insert_query = """
+                    INSERT INTO ladle_history (cameraId, unitId, ladleId, timestamp)
+                    VALUES (%s, %s, %s, %s)
+                """
+                cursor.execute(insert_query, (camera_id, unit_id, ladle_id, datetime.now()))
+                connection.commit()
+            update_query = """
+                    UPDATE camerafeeds
+                    SET ladleId = %s, timestamp = %s
+                    WHERE camera_url = %s
+            """
+            cursor.execute(update_query, (detected_number, datetime.now(), camera_url))
+            connection.commit()
+
+    except OperationalError as e:
+        print(f"Error while connecting to MySQL: {e}")
+    finally:
+        if connection:
+            connection.close()
+            print("MySQL connection closed.")
 
 def model_pred(img, model):
     num = 0
@@ -53,21 +100,40 @@ def model_pred(img, model):
             end_point1 = (int(x1), int(y1))
             cv2.rectangle(img, start_point1, end_point1, color=(0, 255, 0), thickness=2)
             cv2.putText(img, str(num), (int(x0), (int(y0) - 10)), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (36, 255, 12), 2)
-            
-        return img,num
+
+        return img, num
 
     except IndexError:
         print("No number detected")
-        return img,num
+        return img, num
 
 def main():
     model_path = './weights/best.pt'
     model = YOLO(model_path)
-    
-    camera_urls = [
-        0,  # Default webcam
-        'http://192.168.0.3:8080/video',
-    ]
+    camera_urls = []
+    connection = pymysql.connect(
+            host='localhost',
+            database='steeleye',
+            user='ujjawal',
+            password='ujjawal#25012002'
+        )
+    try:
+        with connection.cursor() as cursor:
+            get_query = "SELECT * FROM camerafeeds"
+            cursor.execute(get_query)
+            results = cursor.fetchall()
+            for row in results:
+                if(row[3] == '0'):
+                    camera_urls.append(0)
+                else:
+                    camera_urls.append(row[3])
+    finally:
+        connection.close()
+    # camera_urls = [
+    #     0,  # Default webcam
+    #     # 'http://192.168.0.4:8080/video',  # Example IP camera 1
+    #     # Add more URLs here
+    # ]
 
     caps = [cv2.VideoCapture(url) for url in camera_urls]
     num_lists = [[] for _ in camera_urls]
@@ -83,7 +149,6 @@ def main():
             frame = imutils.resize(frame, width=800, height=800)
             
             if c % 50 == 0:
-                # print(model(frame, model))
                 frame, num = model_pred(frame, model)
                 num_lists[i].append(int(num))
                 print(f'Camera {i+1}: Detected number {num}')
@@ -97,8 +162,11 @@ def main():
             if len(num_list) == 10:
                 num_mode = stats.mode(num_list)
                 num_lists[i] = []
-                print(f'Camera {i+1}: Mode of detected numbers {num_mode}')
-        
+                print(f'Camera {i+1}: {num_list} Mode of detected numbers {num_mode}')
+                # print(camera_urls[i])
+                # insert this number in mysql db
+                insert_number_into_db(camera_urls[i], num_mode)
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
     
