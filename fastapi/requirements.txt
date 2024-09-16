@@ -10,3 +10,10 @@ ultralytics==8.0.228
 scipy
 cryptography
 datetime
+langchain
+langchain-experimental
+openai
+langchain-openai
+langchain-community
+transformers
+accelerate
