@@ -7,6 +7,9 @@ const Navbar = () => {
             <div className="flex justify-between items-center">
                 <NavLink to='/'>Steel Eye | IIT Kharagpur</NavLink>
                 <div className="flex gap-8 items-center">
+                    <NavLink to='/chat'>
+                        Chat
+                    </NavLink>
                     <NavLink to='/manage-units'>
                         Manage Units
                     </NavLink>

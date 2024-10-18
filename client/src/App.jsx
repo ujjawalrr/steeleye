@@ -7,6 +7,7 @@ import ManageLadles from './pages/ManageLadles';
 import Navbar from './components/Navbar';
 import ManageUnits from './pages/ManageUnits';
 import LadleHistory from './pages/LadleHistory';
+import Chat from './pages/Chat';
 
 function App() {
   const [smsUnits, setSmsUnits] = useState([]);
@@ -31,6 +32,7 @@ function App() {
         <Route path="/ladle-history/:unitId/:ladleId" element={<LadleHistory smsUnits={smsUnits} />} />
         <Route path="/manage-ladles" element={<ManageLadles smsUnits={smsUnits} />} />
         <Route path="/manage-units" element={<ManageUnits smsUnits={smsUnits} />} />
+        <Route path="/chat" element={<Chat />} />
       </Routes>
     </BrowserRouter>
   )

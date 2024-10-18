@@ -158,14 +158,21 @@ def sql_query(sql, db: Session):
         # Convert result to lists
         column_list = list(columns)
         row_list = [list(row) for row in rows]
-        
-        return {'columns': column_list, 'rows': row_list}
+        row_final = []
+        for row in row_list:
+            row_dict = {}
+            for i in range(len(column_list)):
+                row_dict[column_list[i]] = row[i]
+            row_final.append(row_dict)
+        print("row_list", row_list)
+        print("row_final", row_final)
+        return {'columns': column_list, 'rows': row_final}
 
     except Exception as e:
         print("Error yha hai",e)
         return {'message': "Error in executing the query!", 'error': str(e)}
 
-@app.post("/message")
+@app.post("/api/message")
 def message_endpoint(msg_req: MessageRequest, db: Session = Depends(get_db)):
     user_message = msg_req.message
     # client_id = msg_req.clientId
