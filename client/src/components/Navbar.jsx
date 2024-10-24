@@ -3,18 +3,27 @@ import { NavLink } from 'react-router-dom'
 
 const Navbar = () => {
     return (
-        <nav className='bg-orange-950 w-full h-[60px] px-4 sm:px-8 flex flex-col justify-center text-white'>
+        <nav className='bg-orange-950 w-full h-[60px] sticky z-50 top-0 px-4 sm:px-8 flex flex-col justify-center text-white'>
             <div className="flex justify-between items-center">
-                <NavLink to='/'>Steel Eye | IIT Kharagpur</NavLink>
+                <NavLink to='/'>Steel Eye</NavLink>
                 <div className="flex gap-8 items-center">
-                    <NavLink to='/chat'>
+                    {/* <NavLink to='/chat'>
                         Chat
-                    </NavLink>
+                    </NavLink> */}
                     <NavLink to='/manage-units'>
                         Manage Units
                     </NavLink>
                     <NavLink to='/manage-ladles'>
                         Manage Ladles
+                    </NavLink>
+                    <NavLink to='/manage-cameras'>
+                        Manage Cameras
+                    </NavLink>
+                    <NavLink to='/manage-users'>
+                        Manage Users
+                    </NavLink>
+                    <NavLink to='/login'>
+                        Login
                     </NavLink>
                 </div>
             </div>

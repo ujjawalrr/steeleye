@@ -3,14 +3,13 @@ from sqlalchemy.orm import Session
 from sqlalchemy import asc, desc, func, text
 from . import models, schemas
 from .database import SessionLocal, engine
-
-
 from openai import AzureOpenAI
 import re
 import json
 from datetime import datetime
 from pydantic import BaseModel
 from dotenv import dotenv_values
+from typing import Optional
 
 values = dotenv_values()
 
@@ -21,6 +20,38 @@ deployment = values['AZURE_OPENAI_DEPLOYMENT_NAME']
 
 models.Base.metadata.create_all(bind=engine)
 
+class UserWithoutPassword(BaseModel):
+    id: str
+    name: str
+    email: str
+    role: str
+    
+class LadleDetails(BaseModel):
+    id: Optional[str]
+    unitId: Optional[str]
+    ladleId: Optional[str]
+    grade: Optional[str]
+    capacity: Optional[float]
+    weight: Optional[float]
+    temperature: Optional[float]
+    timestamp: Optional[datetime]
+
+class CameraFeedWithLadle(BaseModel):
+    id: str
+    unitId: str
+    subunit: str
+    location: str
+    camera_url: str
+    state: bool
+    ladleId: Optional[str]
+    timestamp: datetime
+    last_detection: datetime
+    ladle_details: Optional[LadleDetails]
+    
+    class Config:
+        from_attributes = True
+
+    
 app = FastAPI()
 
 def get_db():
@@ -32,15 +63,82 @@ def get_db():
         
 @app.get("/")
 def test_api():
-    return "Hello World!"
+    return "Welcome to Steel Eye!"
 
-@app.get("/api/camerafeeds/", response_model=list[schemas.CameraFeed])
+@app.get("/api/camerafeeds", response_model=list[schemas.CameraFeed])
 def get_feeds(db: Session = Depends(get_db)):
     return db.query(models.CameraFeed).all()
 
-@app.get("/api/smsunits/", response_model=list[schemas.SmsUnit])
+@app.get("/api/users", response_model=list[UserWithoutPassword])
+def get_users(db: Session = Depends(get_db)):
+    return db.query(models.User.id, models.User.name, models.User.email, models.User.role).order_by(asc(models.User.role)).all()
+
+@app.post("/api/addNewUser", response_model=schemas.User)
+def add_new_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = models.User(**user.dict())
+    
+    db.add(db_user)
+    
+    db.commit()
+    
+    db.refresh(db_user)
+    
+    return db_user
+
+@app.delete("/api/deleteUser/{id}", response_model=schemas.User)
+def delete_user(id: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    db.delete(user)
+    db.commit()
+    
+    return user
+
+@app.get("/api/smsunits", response_model=list[schemas.SmsUnit])
 def get_units(db: Session = Depends(get_db)):
     return db.query(models.SmsUnit).all()
+
+@app.post("/api/addNewUnit", response_model=schemas.SmsUnit)
+def add_new_unit(unit: schemas.SmsUnitCreate, db: Session = Depends(get_db)):
+    db_unit = models.SmsUnit(**unit.dict())
+    
+    db.add(db_unit)
+    
+    db.commit()
+    
+    db.refresh(db_unit)
+    
+    return db_unit
+
+@app.delete("/api/deleteUnit/{id}", response_model=schemas.SmsUnit)
+def delete_unit(id: str, db: Session = Depends(get_db)):
+    unit = db.query(models.SmsUnit).filter(models.SmsUnit.id == id).first()
+    
+    if not unit:
+        raise HTTPException(status_code=404, detail="SMS Unit not found")
+    
+    db.delete(unit)
+    db.commit()
+    
+    return unit
+
+@app.put("/api/updateUnit/{id}", response_model=schemas.SmsUnit)
+def update_unit(id: str, unit: schemas.SmsUnitCreate, db: Session = Depends(get_db)):
+    existing_unit = db.query(models.SmsUnit).filter(models.SmsUnit.id == id).first()
+    
+    if not existing_unit:
+        raise HTTPException(status_code=404, detail="Unit not found")
+    
+    for key, value in unit.dict().items():
+        setattr(existing_unit, key, value)
+    
+    db.commit()
+    db.refresh(existing_unit)
+    
+    return existing_unit
 
 @app.get("/api/unitladles/{unitId}", response_model=list[schemas.Ladle])
 def get_unit_ladles(unitId: str, db: Session = Depends(get_db)):
@@ -49,7 +147,7 @@ def get_unit_ladles(unitId: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ladles not found for the specified unit")
     return ladles
 
-@app.post("/api/addNewLadle/", response_model=schemas.Ladle)
+@app.post("/api/addNewLadle", response_model=schemas.Ladle)
 def add_new_ladle(ladle: schemas.LadleCreate, db: Session = Depends(get_db)):
     db_ladle = models.Ladle(**ladle.dict())
     
@@ -62,7 +160,7 @@ def add_new_ladle(ladle: schemas.LadleCreate, db: Session = Depends(get_db)):
     return db_ladle
 
 @app.delete("/api/deleteLadle/{id}", response_model=schemas.Ladle)
-def delete_ladle(id: int, db: Session = Depends(get_db)):
+def delete_ladle(id: str, db: Session = Depends(get_db)):
     ladle = db.query(models.Ladle).filter(models.Ladle.id == id).first()
     
     if not ladle:
@@ -73,31 +171,138 @@ def delete_ladle(id: int, db: Session = Depends(get_db)):
     
     return ladle
 
-@app.delete("/api/deleteUnit/{id}", response_model=schemas.SmsUnit)
-def delete_unit(id: int, db: Session = Depends(get_db)):
-    unit = db.query(models.SmsUnit).filter(models.SmsUnit.id == id).first()
+@app.put("/api/updateLadle/{id}", response_model=schemas.Ladle)
+def update_ladle(id: str, ladle: schemas.LadleCreate, db: Session = Depends(get_db)):
+    existing_ladle = db.query(models.Ladle).filter(models.Ladle.id == id).first()
     
-    if not unit:
-        raise HTTPException(status_code=404, detail="SMS Unit not found")
+    if not existing_ladle:
+        raise HTTPException(status_code=404, detail="Ladle not found")
     
-    db.delete(unit)
+    for key, value in ladle.dict().items():
+        setattr(existing_ladle, key, value)
+    
+    db.commit()
+    db.refresh(existing_ladle)
+    
+    return existing_ladle
+
+@app.get("/api/unitcameras/{unitId}", response_model=list[CameraFeedWithLadle])
+def get_unit_cameras(unitId: str, db: Session = Depends(get_db)):
+    # Perform a LEFT JOIN between CameraFeed and Ladle on ladleId
+    camerafeeds_with_ladle = (
+        db.query(models.CameraFeed, models.Ladle)
+        .outerjoin(models.Ladle, models.CameraFeed.ladleId == models.Ladle.id)
+        .filter(models.CameraFeed.unitId == unitId)
+        .order_by(asc(models.CameraFeed.location))
+        .all()
+    )
+    
+    if not camerafeeds_with_ladle:
+        raise HTTPException(status_code=404, detail="Cameras not found for the specified unit")
+
+    # Format the result to match the response model
+    result = []
+    for camera_feed, ladle in camerafeeds_with_ladle:
+        camera_feed_data = {
+            "id": camera_feed.id,
+            "unitId": camera_feed.unitId,
+            "subunit": camera_feed.subunit,
+            "location": camera_feed.location,
+            "camera_url": camera_feed.camera_url,
+            "state": camera_feed.state,
+            "ladleId": camera_feed.ladleId,
+            "timestamp": camera_feed.timestamp,
+            "last_detection": camera_feed.last_detection,
+            "ladle_details": {
+                "id": ladle.id if ladle else None,
+                "unitId": ladle.unitId if ladle else None,
+                "ladleId": ladle.ladleId if ladle else None,
+                "grade": ladle.grade if ladle else None,
+                "capacity": ladle.capacity if ladle else None,
+                "weight": ladle.weight if ladle else None,
+                "temperature": ladle.temperature if ladle else None,
+                "timestamp": ladle.timestamp if ladle else None,
+            } if ladle else None  # Handle case when ladle is None
+        }
+        result.append(camera_feed_data)
+
+    return result
+
+
+@app.post("/api/addNewCamera", response_model=schemas.CameraFeed)
+def add_new_camerafeed(camerafeed: schemas.CameraFeedCreate, db: Session = Depends(get_db)):
+    db_camerafeed = models.CameraFeed(**camerafeed.dict())
+    
+    db.add(db_camerafeed)
+    
     db.commit()
     
-    return unit
+    db.refresh(db_camerafeed)
+    
+    return db_camerafeed
 
-@app.get("/api/ladle-history/{unitId}/{ladleId}", response_model=list[schemas.LadleHistory])
-def get_unit_ladles(unitId: str, ladleId: str, db: Session = Depends(get_db)):
-    history = db.query(models.LadleHistory).filter((models.LadleHistory.unitId == unitId) & (models.LadleHistory.ladleId == ladleId)).order_by(desc(models.LadleHistory.timestamp)).all()
+@app.delete("/api/deleteCamera/{id}", response_model=schemas.CameraFeed)
+def delete_camerafeed(id: str, db: Session = Depends(get_db)):
+    camerafeed = db.query(models.CameraFeed).filter(models.CameraFeed.id == id).first()
+    
+    if not camerafeed:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    
+    db.delete(camerafeed)
+    db.commit()
+    
+    return camerafeed
+
+class CameraFeedUpdate(BaseModel):
+    state: bool
+    
+@app.put("/api/toggleCameraState/{id}", response_model=schemas.CameraFeed)
+def toggle_camera_state(id: str, state: CameraFeedUpdate, db: Session = Depends(get_db)):
+    camerafeed = db.query(models.CameraFeed).filter(models.CameraFeed.id == id).first()
+    
+    if not camerafeed:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    
+    camerafeed.state = state.state
+    db.commit()
+    db.refresh(camerafeed)
+    
+    return camerafeed
+
+@app.put("/api/updateCamera/{id}", response_model=schemas.CameraFeed)
+def update_camerafeed(id: str, camerafeed: schemas.CameraFeed, db: Session = Depends(get_db)):
+    existing_camerafeed = db.query(models.CameraFeed).filter(models.CameraFeed.id == id).first()
+    
+    if not existing_camerafeed:
+        raise HTTPException(status_code=404, detail="Camera not found")
+    
+    for key, value in camerafeed.dict().items():
+        setattr(existing_camerafeed, key, value)
+    
+    db.commit()
+    db.refresh(existing_camerafeed)
+    
+    return existing_camerafeed
+
+@app.get("/api/ladle/{id}", response_model=schemas.Ladle)
+def get_ladle(id: str, db: Session = Depends(get_db)):
+    ladle = db.query(models.Ladle).filter(models.Ladle.id == id).first()
+    if not ladle:
+        raise HTTPException(status_code=404, detail="Ladle not found")
+    return ladle
+
+@app.get("/api/ladle-history/{id}", response_model=list[schemas.LadleHistory])
+def get_ladle_history(id: str, db: Session = Depends(get_db)):
+    history = db.query(models.LadleHistory).filter(models.LadleHistory.ladleId == id).order_by(desc(models.LadleHistory.departure_time)).all()
     if not history:
         raise HTTPException(status_code=404, detail="History not found for the specified ladle")
     return history
 
-@app.get("/api/cycle-count/{unitId}/{ladleId}", response_model=int)
-def get_cycle_count(unitId: str, ladleId: str, db: Session = Depends(get_db)):
+@app.get("/api/cycle-count/{id}", response_model=int)
+def get_cycle_count(id: str, db: Session = Depends(get_db)):
     count = db.query(func.count()).filter(
-        (models.LadleHistory.cameraId == f"{unitId.replace(" ", "")}_01") &
-        (models.LadleHistory.unitId == unitId) &
-        (models.LadleHistory.ladleId == ladleId)
+        (models.LadleHistory.cameraId == f"{id.replace(" ", "")}_01") &
+        (models.LadleHistory.ladleId == id)
     ).scalar()
 
     if count == 0:
@@ -278,3 +483,5 @@ def message_endpoint(msg_req: MessageRequest, db: Session = Depends(get_db)):
         print(f"Error in processing the request: {e}")
         # Optionally include the error message in the HTTPException
         raise HTTPException(status_code=500, detail=f"Error in processing the request: {e}")
+
+

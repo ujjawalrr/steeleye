@@ -6,44 +6,102 @@ import statistics as stats
 import pymysql
 from pymysql import OperationalError
 from datetime import datetime
-# connection = pymysql.connect(
-        #     host='localhost',
-        #     database='test',
-        #     user='prudhvi',
-        #     password='prudhvi'
-        # )
-def insert_number_into_db(camera_url, detected_number):
+
+host='localhost'
+database='steel-eye'
+user='ujjawal'
+password='ujjawal#25012002'
+
+def insert_number_into_db(camera, detected_number):
     try:
         connection = pymysql.connect(
-            host='localhost',
-            database='steeleye',
-            user='ujjawal',
-            password='ujjawal#25012002'
+            host=host,
+            database=database,
+            user=user,
+            password=password
         )
-        
+        camera_unitId = camera['unitId']
+        previous_ladleId = camera['ladleId']
+        camera_id = camera['id']
+        camera_timestamp = camera['timestamp']
         with connection.cursor() as cursor:
-            get_query = """SELECT * FROM camerafeeds WHERE camera_url = %s"""
-            cursor.execute(get_query, (camera_url))
-            results = cursor.fetchall()
-            ladle_id = results[0][2]
-            unit_id = results[0][5]
-            camera_id = results[0][1]
-            print(results[0])
-            if str(ladle_id) != str(detected_number):
-                insert_query = """
-                    INSERT INTO ladle_history (cameraId, unitId, ladleId, timestamp)
-                    VALUES (%s, %s, %s, %s)
-                """
-                cursor.execute(insert_query, (camera_id, unit_id, ladle_id, datetime.now()))
-                connection.commit()
-            update_query = """
-                    UPDATE camerafeeds
-                    SET ladleId = %s, timestamp = %s
-                    WHERE camera_url = %s
-            """
-            cursor.execute(update_query, (detected_number, datetime.now(), camera_url))
-            connection.commit()
-
+            current_time = datetime.now()
+            if detected_number == 0:
+                if(previous_ladleId != str(detected_number)):
+                    if previous_ladleId != '0':
+                        get_previous_ladle_query = """SELECT * FROM ladles WHERE id = %s"""
+                        cursor.execute(get_previous_ladle_query, (previous_ladleId))
+                        results = cursor.fetchall()
+                        if len(results) != 0:
+                            ladle_temperature = results[0][6]
+                            measurement_time = results[0][7]
+                            time_difference = current_time - measurement_time
+                            difference_in_minutes = time_difference.total_seconds() / 60
+                            current_temperature = ladle_temperature - (difference_in_minutes * 10 / 15)
+                            
+                            insert_query = """
+                                INSERT INTO ladle_history (cameraId, ladleId, temperature, arrival_time, departure_time)
+                                VALUES (%s, %s, %s, %s, %s)
+                            """
+                            cursor.execute(insert_query, (camera_id, previous_ladleId, current_temperature, camera_timestamp, current_time))
+                    
+                    update_query = """
+                        UPDATE camerafeeds
+                        SET ladleId = %s, timestamp = %s, last_detection = %s
+                        WHERE id = %s
+                    """
+                    cursor.execute(update_query, (str(detected_number), current_time, current_time, camera_id))
+                    connection.commit()
+                else:
+                    update_query = """
+                        UPDATE camerafeeds
+                        SET last_detection = %s
+                        WHERE id = %s
+                    """
+                    cursor.execute(update_query, (current_time, camera_id))
+                    connection.commit()
+                    
+            else:
+                get_ladle_query = """SELECT * FROM ladles WHERE unitId = %s AND ladleId = %s"""
+                cursor.execute(get_ladle_query, (camera_unitId, str(detected_number)))
+                results = cursor.fetchall()
+                if len(results) != 0:
+                    detected_ladleId = results[0][0]
+                    if(previous_ladleId != detected_ladleId):
+                        if previous_ladleId != '0':
+                            get_previous_ladle_query = """SELECT * FROM ladles WHERE id = %s"""
+                            cursor.execute(get_previous_ladle_query, (previous_ladleId))
+                            previous_ladle_results = cursor.fetchall()
+                            ladle_temperature = previous_ladle_results[0][6]
+                            measurement_time = previous_ladle_results[0][7]
+                            time_difference = current_time - measurement_time
+                            difference_in_minutes = time_difference.total_seconds() / 60
+                            current_temperature = ladle_temperature - (difference_in_minutes * 10 / 15)
+                            
+                            insert_query = """
+                                INSERT INTO ladle_history (cameraId, ladleId, temperature, arrival_time, departure_time)
+                                VALUES (%s, %s, %s, %s, %s)
+                            """
+                            cursor.execute(insert_query, (camera_id, previous_ladleId, current_temperature, camera_timestamp, current_time))
+                    
+                        update_query = """
+                            UPDATE camerafeeds
+                            SET ladleId = %s, timestamp = %s, last_detection = %s
+                            WHERE id = %s
+                        """
+                        cursor.execute(update_query, (detected_ladleId, current_time, current_time, camera_id))
+                        connection.commit()
+                    else:
+                        update_query = """
+                            UPDATE camerafeeds
+                            SET last_detection = %s
+                            WHERE id = %s
+                        """
+                        cursor.execute(update_query, (current_time, camera_id))
+                        connection.commit()
+                else:
+                    print("Ask admin to resister new ladle in database")
+                    
     except OperationalError as e:
         print(f"Error while connecting to MySQL: {e}")
     finally:
@@ -111,35 +169,46 @@ def main():
     model_path = './weights/best.pt'
     model = YOLO(model_path)
     camera_urls = []
+    cameras = []
     connection = pymysql.connect(
-            host='localhost',
-            database='steeleye',
-            user='ujjawal',
-            password='ujjawal#25012002'
+            host=host,
+            database=database,
+            user=user,
+            password=password
         )
+    
     try:
         with connection.cursor() as cursor:
-            get_query = "SELECT * FROM camerafeeds"
+            get_query = "SELECT * FROM camerafeeds WHERE state = 1"
             cursor.execute(get_query)
             results = cursor.fetchall()
             for row in results:
-                if(row[3] == '0'):
+                camera = {
+                    'id': row[0],
+                    'unitId': row[1],
+                    'subunit': row[2],
+                    'location': row[3],
+                    'url': row[4],
+                    'ladleId': row[6],
+                    'timestamp': row[7]
+                }
+                cameras.append(camera)
+                if(row[4] == '0'):
                     camera_urls.append(0)
                 else:
-                    camera_urls.append(row[3])
+                    camera_urls.append(row[4])    
     finally:
         connection.close()
-    # camera_urls = [
-    #     0,  # Default webcam
-    #     # 'http://192.168.0.4:8080/video',  # Example IP camera 1
-    #     # Add more URLs here
-    # ]
-
-    caps = [cv2.VideoCapture(url) for url in camera_urls]
-    num_lists = [[] for _ in camera_urls]
+        
+    insert_number_into_db(cameras[0], 21)
+    
+    # caps = [cv2.VideoCapture(url) for url in camera_urls]
+    # num_lists = [[] for _ in camera_urls]
+    caps = []
+    num_lists = []
     c = 1
 
-    while True:
+    while False:
         for i, cap in enumerate(caps):
             ret, frame = cap.read()
             if not ret:
@@ -165,7 +234,7 @@ def main():
                 print(f'Camera {i+1}: {num_list} Mode of detected numbers {num_mode}')
                 # print(camera_urls[i])
                 # insert this number in mysql db
-                insert_number_into_db(camera_urls[i], num_mode)
+                # insert_number_into_db(cameras[i], num_mode)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

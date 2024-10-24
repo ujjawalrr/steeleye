@@ -4,20 +4,42 @@ import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import { Line } from 'react-chartjs-2';
-import Chart from 'chart.js/auto';
 
 const LadleHistory = ({ smsUnits }) => {
+    const [selectedUnit, setSelectedUnit] = useState('');
+    const updateSelectedUnit = (value) => {
+        setSelectedUnit(value);
+    }
+    useEffect(() => {
+        if (smsUnits?.length > 0) {
+            setSelectedUnit(smsUnits[0].unitId);
+        }
+    }, [smsUnits]);
     const params = useParams();
     const [history, setHistory] = useState([]);
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
     const [cycleCount, setCycleCount] = useState();
+    const [ladleData, setLadleData] = useState();
+    const [fetchingLadleData, setFetchingLadleData] = useState(true);
+
+    const getLadleData = async () => {
+        try {
+            setFetchingLadleData(true);
+            const response = await axios.get(`/api/ladle/${params.id}`);
+            setLadleData(response.data);
+        } catch (error) {
+            console.log(error);
+        } finally {
+            setFetchingLadleData(false);
+        }
+    };
 
     const getHistory = async () => {
         try {
             setLoading(true);
             setError(false);
-            const response = await axios.get(`/api/ladle-history/${params.unitId}/${params.ladleId}`);
+            const response = await axios.get(`/api/ladle-history/${params.id}`);
             setHistory(response.data);
         } catch (error) {
             setError(error.response.data.detail || "History not found!");
@@ -28,7 +50,7 @@ const LadleHistory = ({ smsUnits }) => {
 
     const getCycleCount = async () => {
         try {
-            const response = await axios.get(`/api/cycle-count/${params.unitId}/${params.ladleId}`);
+            const response = await axios.get(`/api/cycle-count/${params.id}`);
             setCycleCount(response.data);
         } catch (error) {
             console.log(error);
@@ -36,9 +58,10 @@ const LadleHistory = ({ smsUnits }) => {
     };
 
     useEffect(() => {
+        getLadleData();
         getHistory();
         getCycleCount();
-    }, [params]);
+    }, [params.id]);
 
     const formatDate = (dateString) => {
         const optionsTime = {
@@ -123,15 +146,15 @@ const LadleHistory = ({ smsUnits }) => {
     
     return (
         <main className='flex'>
-            <Sidebar smsUnits={smsUnits} />
+            <Sidebar smsUnits={smsUnits} selectedUnit={selectedUnit} updateSelectedUnit={updateSelectedUnit} />
             <div className='min-h-[calc(100vh-60px)] w-full'>
                 <div className='p-16 flex flex-col justify-center items-center w-full'>
-                    <h1 className='text-2xl mb-4'>{params.unitId}</h1>
-                    <p className='text-xl mb-8'>Ladle {params.ladleId}</p>
+                    <h1 className='text-2xl mb-4'>{selectedUnit}</h1>
+                    <p className='text-xl mb-8'>Ladle {ladleData?.ladleId}</p>
                     <div className='mb-8'>
                         <div className='border border-orange-700 shadow-md rounded-lg p-4 text-center'>
                             <h1 className='text-xl'>No. of Cycles</h1>
-                            <p className='text-2xl'>{cycleCount && cycleCount - 1}</p>
+                            <p className='text-2xl'>{cycleCount ? cycleCount - 1 : '---'}</p>
                         </div>
                     </div>
                     {loading ? 'Loading'

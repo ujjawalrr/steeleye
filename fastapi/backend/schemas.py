@@ -3,16 +3,30 @@ from datetime import datetime
 
 class LadleHistoryBase(BaseModel):
     cameraId: str
-    unitId: str
+    ladleId: str
+    temperature: float
+    arrival_time: datetime
+    departure_time: datetime
+    
+class LadleMaintainanceHistoryBase(BaseModel):
     ladleId: str
     timestamp: datetime
+    maintainedBy: str
+    
+class UserBase(BaseModel):
+    name: str
+    email: str
+    role: str
     
 class CameraFeedBase(BaseModel):
-    cameraId: str
     unitId: str
-    ladleId: str
+    subunit: str
+    location: str
     camera_url: str
+    state: bool
+    ladleId: str
     timestamp: datetime
+    last_detection: datetime
     
 class SmsUnitBase(BaseModel):
     unitId: str
@@ -20,6 +34,11 @@ class SmsUnitBase(BaseModel):
 class LadleBase(BaseModel):
     unitId: str
     ladleId: str
+    grade: str
+    capacity: float
+    weight: float
+    temperature: float
+    timestamp: datetime
 
 class LadleHistoryCreate(LadleHistoryBase):
     pass
@@ -30,11 +49,29 @@ class LadleHistory(LadleHistoryBase):
     class Config:
         from_attributes = True
         
+class LadleMaintainanceHistoryCreate(LadleMaintainanceHistoryBase):
+    pass
+
+class LadleMaintainanceHistory(LadleMaintainanceHistoryBase):
+    id: str
+
+    class Config:
+        from_attributes = True
+        
+class UserCreate(UserBase):
+    pass
+
+class User(UserBase):
+    id: str
+
+    class Config:
+        from_attributes = True
+        
 class CameraFeedCreate(CameraFeedBase):
     pass
 
 class CameraFeed(CameraFeedBase):
-    id: int
+    id: str
 
     class Config:
         from_attributes = True
@@ -43,7 +80,7 @@ class SmsUnitCreate(SmsUnitBase):
     pass
 
 class SmsUnit(SmsUnitBase):
-    id: int
+    id: str
 
     class Config:
         from_attributes = True
@@ -52,7 +89,7 @@ class LadleCreate(LadleBase):
     pass
 
 class Ladle(LadleBase):
-    id: int
+    id: str
 
     class Config:
         from_attributes = True
