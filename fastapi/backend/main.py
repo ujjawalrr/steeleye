@@ -10,6 +10,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from dotenv import dotenv_values
 from typing import Optional
+import random
 
 values = dotenv_values()
 
@@ -25,6 +26,13 @@ class UserWithoutPassword(BaseModel):
     name: str
     email: str
     role: str
+    
+class Password(BaseModel):
+    password: str
+    
+class LoginForm(BaseModel):
+    email: str
+    password: str
     
 class LadleDetails(BaseModel):
     id: Optional[str]
@@ -69,9 +77,52 @@ def test_api():
 def get_feeds(db: Session = Depends(get_db)):
     return db.query(models.CameraFeed).all()
 
-@app.get("/api/users", response_model=list[UserWithoutPassword])
+@app.get("/api/users", response_model=list[schemas.User])
 def get_users(db: Session = Depends(get_db)):
     return db.query(models.User.id, models.User.name, models.User.email, models.User.role).order_by(asc(models.User.role)).all()
+
+@app.post("/api/login", response_model=schemas.User)
+def login_user(login: LoginForm, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.email == login.email).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if not user.password:
+        token = random.randint(100000, 999999)
+        user.reset_token = token
+        db.commit()
+        db.refresh(user)
+        detail = {}
+        detail['token'] = token
+        detail['user_id'] = user.id
+        raise HTTPException(status_code=402, detail=detail)
+    
+    if user.password != login.password:
+        raise HTTPException(status_code=401, detail="Invalid password")
+    
+    # user_response = UserWithoutPassword(id=user.id, name=user.name, email=user.email, role=user.role)
+    
+    return user
+
+@app.post("/api/reset-password/{id}/{token}", response_model=schemas.User)
+def reset_password(password: Password, id: str, token: str, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == id).first()
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.reset_token != token:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    user.password = password.password
+    user.reset_token = None
+    db.commit()
+    db.refresh(user)
+    
+    user_response = schemas.User(id=user.id, name=user.name, email=user.email, role=user.role)
+    
+    return user_response
 
 @app.post("/api/addNewUser", response_model=schemas.User)
 def add_new_user(user: schemas.UserCreate, db: Session = Depends(get_db)):

@@ -26,6 +26,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True)
     role = Column(String(36), index=True)
     password = Column(String(255), index=True)
+    reset_token = Column(String(255), index=True)
     
 class CameraFeed(Base):
     __tablename__ = "camerafeeds"
