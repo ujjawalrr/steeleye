@@ -6,7 +6,7 @@ from .database import Base
 class LadleHistory(Base):
     __tablename__ = "ladle_history"
     id = Column(INT, primary_key=True, index=True)
-    cameraId = Column(String(36), index=True)
+    location = Column(String(255), index=True)
     ladleId = Column(String(36), index=True)
     temperature = Column(Float, index=True)
     arrival_time = Column(DateTime(timezone=True), server_default=func.now(), index=True)

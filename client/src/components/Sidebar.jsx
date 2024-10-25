@@ -14,7 +14,6 @@ const Sidebar = ({ smsUnits, selectedUnit, updateSelectedUnit }) => {
                 setUnitLadles(response.data);
             }
         } catch (error) {
-            console.log(error);
         } finally {
             setGettingUnitLadles(false);
         }

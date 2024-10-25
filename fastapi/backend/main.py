@@ -237,6 +237,24 @@ def update_ladle(id: str, ladle: schemas.LadleCreate, db: Session = Depends(get_
     
     return existing_ladle
 
+class LadleTemperatureUpdate(BaseModel):
+    temperature: float
+    timestamp: datetime
+    
+@app.put("/api/updateLadleTemperature/{id}", response_model=schemas.Ladle)
+def toggle_camera_state(id: str, temperature: LadleTemperatureUpdate, db: Session = Depends(get_db)):
+    ladle = db.query(models.Ladle).filter(models.Ladle.id == id).first()
+    
+    if not ladle:
+        raise HTTPException(status_code=404, detail="Ladle not found")
+    
+    ladle.temperature = temperature.temperature
+    ladle.timestamp = temperature.timestamp
+    db.commit()
+    db.refresh(ladle)
+    
+    return ladle
+
 @app.get("/api/unitcameras/{unitId}", response_model=list[CameraFeedWithLadle])
 def get_unit_cameras(unitId: str, db: Session = Depends(get_db)):
     # Perform a LEFT JOIN between CameraFeed and Ladle on ladleId
@@ -349,18 +367,17 @@ def get_ladle_history(id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="History not found for the specified ladle")
     return history
 
-@app.get("/api/cycle-count/{id}", response_model=int)
-def get_cycle_count(id: str, db: Session = Depends(get_db)):
-    count = db.query(func.count()).filter(
-        (models.LadleHistory.cameraId == f"{id.replace(" ", "")}_01") &
-        (models.LadleHistory.ladleId == id)
-    ).scalar()
+# @app.get("/api/cycle-count/{id}", response_model=int)
+# def get_cycle_count(id: str, db: Session = Depends(get_db)):
+#     count = db.query(func.count()).filter(
+#         (models.LadleHistory.ladleId == id) &
+#         (models.LadleHistory.location.like("CCM %"))
+#     ).scalar()
 
-    if count == 0:
-        raise HTTPException(status_code=404, detail="No history found for the specified ladle")
+#     if count == 0:
+#         raise HTTPException(status_code=404, detail="No history found for the specified ladle")
 
-    return count
-
+#     return count
 
 class MessageRequest(BaseModel):
     message: str

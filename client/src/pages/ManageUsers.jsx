@@ -24,7 +24,6 @@ const ManageUsers = () => {
                 setUsers(response.data);
             }
         } catch (error) {
-            console.log(error);
         } finally {
             setGettingUsers(false);
         }
@@ -86,10 +85,6 @@ const ManageUsers = () => {
             ),
         },
     ];
-
-    // if (!showAction) {
-    //     columns = columns.filter(column => column.key !== 'Action');
-    // }
 
     return (
         <div className='px-4 sm:px-12 lg:px-24 py-4 lg:py-8'>

@@ -1,9 +1,10 @@
-import { Table } from 'antd';
+import { Skeleton, Table } from 'antd';
 import axios from 'axios';
 import React, { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
-import { Line } from 'react-chartjs-2';
+import moment from 'moment';
+import EditTemperature from '../components/EditTemperature';
 
 const LadleHistory = ({ smsUnits }) => {
     const [selectedUnit, setSelectedUnit] = useState('');
@@ -19,17 +20,20 @@ const LadleHistory = ({ smsUnits }) => {
     const [history, setHistory] = useState([]);
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
-    const [cycleCount, setCycleCount] = useState();
+    // const [cycleCount, setCycleCount] = useState();
     const [ladleData, setLadleData] = useState();
+    const updateLadleData = (data) => {
+        setLadleData(data);
+    };
     const [fetchingLadleData, setFetchingLadleData] = useState(true);
 
     const getLadleData = async () => {
         try {
+            setLadleData();
             setFetchingLadleData(true);
             const response = await axios.get(`/api/ladle/${params.id}`);
             setLadleData(response.data);
         } catch (error) {
-            console.log(error);
         } finally {
             setFetchingLadleData(false);
         }
@@ -38,6 +42,7 @@ const LadleHistory = ({ smsUnits }) => {
     const getHistory = async () => {
         try {
             setLoading(true);
+            setHistory([]);
             setError(false);
             const response = await axios.get(`/api/ladle-history/${params.id}`);
             setHistory(response.data);
@@ -48,143 +53,114 @@ const LadleHistory = ({ smsUnits }) => {
         }
     };
 
-    const getCycleCount = async () => {
-        try {
-            const response = await axios.get(`/api/cycle-count/${params.id}`);
-            setCycleCount(response.data);
-        } catch (error) {
-            console.log(error);
-        }
-    };
+    // const getCycleCount = async () => {
+    //     try {
+    //         setCycleCount();
+    //         const response = await axios.get(`/api/cycle-count/${params.id}`);
+    //         setCycleCount(response.data);
+    //     } catch (error) {
+    //     }
+    // };
 
     useEffect(() => {
-        getLadleData();
-        getHistory();
-        getCycleCount();
+        params.id && getLadleData();
+        params.id && getHistory();
+        // params.id && getCycleCount();
     }, [params.id]);
-
-    const formatDate = (dateString) => {
-        const optionsTime = {
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: true,
-        };
-        const optionsDate = {
-            year: '2-digit',
-            month: '2-digit',
-            day: '2-digit',
-        };
-
-        const date = new Date(dateString);
-        const formattedTime = date.toLocaleTimeString('en-GB', optionsTime);
-        const formattedDate = date.toLocaleDateString('en-GB', optionsDate);
-
-        return `${formattedTime} ${formattedDate}`;
-    };
 
     const columns = [
         {
             title: 'Location',
-            dataIndex: 'cameraId',
-            key: 'cameraId',
+            dataIndex: 'location',
+            key: 'location',
         },
         {
-            title: 'Timestamp',
-            dataIndex: 'timestamp',
-            key: 'timestamp',
+            title: 'Temperature (°C)',
+            dataIndex: 'temperature',
+            key: 'temperature',
+        },
+        {
+            title: 'Arrival Time',
+            dataIndex: 'arrival_time',
+            key: 'arrival_time',
+        },
+        {
+            title: 'Departure Time',
+            dataIndex: 'departure_time',
+            key: 'departure_time',
         }
     ];
 
-    // Create a mapping for cameraId to numeric values
-    const cameraIdMapping = {
-        'SMS1_01': 1,
-        'SMS1_02': 2,
-        'SMS1_03': 3,
+    const renderLadleDetail = (label, value) => (
+        <div className="flex gap-8 justify-between items-end">
+            <span className='text-orange-950 font-semibold text-xl'>{label}</span>
+            <span>{value}</span>
+        </div>
+    );
+
+    const renderExpectedTemperature = (item) => {
+        const minElapsed = moment().diff(moment.utc(item.timestamp).local(), 'minutes');
+        const expectedTemp = (item.temperature - (minElapsed * 10 / 15)).toFixed(2);
+        return (
+            <div className="flex gap-8 justify-between items-end">
+                <span className='text-orange-950 font-semibold text-xl'>Current Temperature</span>
+                <span>{expectedTemp > 0 ? `${expectedTemp} °C` : 'Measure'}</span>
+            </div>
+        );
     };
 
-    // Prepare data for the chart
-    const chartData = {
-        labels: history.map((location) => formatDate(location.timestamp)),
-        datasets: [
-            {
-                label: 'Camera ID',
-                data: history.map((location) => cameraIdMapping[location.cameraId] || 0), // Map cameraId to numeric
-                borderColor: 'rgba(75, 192, 192, 1)',
-                borderWidth: 2,
-                fill: false,
-            },
-        ],
-    };
-
-    const chartOptions = {
-        responsive: true,
-        scales: {
-            x: {
-                title: {
-                    display: true,
-                    text: 'Timestamp',
-                },
-            },
-            y: {
-                title: {
-                    display: true,
-                    text: 'Camera ID',
-                },
-                ticks: {
-                    callback: function (value) {
-                        // Reverse map numeric values to cameraId labels
-                        return Object.keys(cameraIdMapping).find(key => cameraIdMapping[key] === value) || '';
-                    },
-                    stepSize: 1, // Force only whole numbers on the Y-axis
-                },
-                min: 1, // Start from 1 (SMS1_01)
-                max: 3, // End at 3 (SMS1_03)
-            },
-        },
-    };
-    
     return (
         <main className='flex'>
             <Sidebar smsUnits={smsUnits} selectedUnit={selectedUnit} updateSelectedUnit={updateSelectedUnit} />
-            <div className='min-h-[calc(100vh-60px)] w-full'>
-                <div className='p-16 flex flex-col justify-center items-center w-full'>
-                    <h1 className='text-2xl mb-4'>{selectedUnit}</h1>
-                    <p className='text-xl mb-8'>Ladle {ladleData?.ladleId}</p>
-                    <div className='mb-8'>
-                        <div className='border border-orange-700 shadow-md rounded-lg p-4 text-center'>
-                            <h1 className='text-xl'>No. of Cycles</h1>
-                            <p className='text-2xl'>{cycleCount ? cycleCount - 1 : '---'}</p>
+            <div className='min-h-[calc(100vh-60px)] w-full p-4 max-w-[900px] mx-auto'>
+                {(fetchingLadleData || loading) ?
+                    <Skeleton active />
+                    :
+                    <div className='space-y-8'>
+                        <div className='flex items-center justify-between gap-16'>
+                            <div className="space-y-4 text-center">
+                                <div className="text-[160px] leading-[160px] font-semibold text-orange-950">{ladleData.ladleId}</div>
+                                <div className="">Ladle Number</div>
+                            </div>
+                            <div className="flex-1">
+                                <div className='p-4 space-y-2 max-w-[450px] w-full'>
+                                    {renderLadleDetail('Grade', ladleData.grade || '----')}
+                                    {renderLadleDetail('Capacity', `${ladleData.capacity} tonn`)}
+                                    {renderLadleDetail('Weight', `${ladleData.weight} kg`)}
+                                    {renderExpectedTemperature(ladleData)}
+                                    {renderLadleDetail('Measured Temperature', `${ladleData.temperature} °C`)}
+                                    {renderLadleDetail('Last Measured', moment.utc(ladleData.timestamp).local().fromNow())}
+                                </div>
+                            </div>
+                            <div className='spacey-y-4'>
+                                {/* <div>
+                                    <div className='text-center text-2xl font-medium text-orange-950'>Cycle Count</div>
+                                    <div className='text-center text-4xl font-semibold text-orange-950'>{history.filter(item => item.location.startsWith('CCM ')).length}</div>
+                                </div> */}
+                                {renderLadleDetail('Cycle', history.filter(item => item.location.startsWith('CCM ')).length)}
+                                <div className='pt-4'>
+                                    <EditTemperature ladleData={ladleData} updateLadleData={updateLadleData} />
+                                </div>
+                            </div>
+                        </div>
+                        <div className='space-y-6'>
+                            <h1 className='text-center text-2xl font-medium text-orange-950'>Tracking History</h1>
+                            <Table
+                                className='w-full'
+                                size="small"
+                                columns={columns}
+                                dataSource={history.map((item) => ({
+                                    key: item.id,
+                                    location: item.location,
+                                    temperature: item.temperature,
+                                    arrival_time: moment.utc(item.arrival_time).local().format('YYYY-MM-DD HH:mm:ss'),
+                                    departure_time: moment.utc(item.departure_time).local().format('YYYY-MM-DD HH:mm:ss'),
+                                }))}
+                                pagination={history.length > 50 ? { pageSize: 50 } : false}
+                            />
                         </div>
                     </div>
-                    {loading ? 'Loading'
-                        :
-                        <>
-                            {error ?
-                                <p className='text-red-500'>{error}</p> :
-                                <>
-                                    <Table
-                                        className='w-full'
-                                        columns={columns}
-                                        dataSource={history.map((location) => ({
-                                            key: location.id,
-                                            cameraId: location.cameraId,
-                                            timestamp: formatDate(location.timestamp)
-                                        }))}
-                                    />
-                                    {/* Render the chart */}
-                                    {history.length > 0 ? (
-                                        <div className='mt-8 w-full h-96'>
-                                            <Line data={chartData} options={chartOptions} />
-                                        </div>
-                                    ) : (
-                                        <p>No history data available</p>
-                                    )}
-                                </>
-                            }
-                        </>
-                    }
-                </div>
+                }
             </div>
         </main>
     );

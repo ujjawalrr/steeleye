@@ -33,7 +33,6 @@ const ManageLadles = ({ smsUnits }) => {
                 setUnitLadles(response.data);
             }
         } catch (error) {
-            console.log(error);
         } finally {
             setGettingUnitLadles(false);
         }
@@ -123,7 +122,7 @@ const ManageLadles = ({ smsUnits }) => {
                     :
                     unitLadles?.length === 0 ? <p className='text-center'>No ladles found</p>
                         :
-                        <div className='grid grid-cols-3 gap-12'>
+                        <div className='grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-12'>
                             {unitLadles?.map((item) => (
                                 <div key={item.id} className='relative shadow-sm cursor-pointer border rounded-md bg-white flex justify-center items-center'>
                                     <div className='p-4 space-y-2 w-full'>
@@ -132,8 +131,8 @@ const ManageLadles = ({ smsUnits }) => {
                                         {renderLadleDetail('Capacity', `${item.capacity} tonn`)}
                                         {renderLadleDetail('Weight', `${item.weight} kg`)}
                                         {renderExpectedTemperature(item)}
-                                        {renderLadleDetail('Last Measured', moment.utc(item.timestamp).local().fromNow())}
                                         {renderLadleDetail('Measured Temperature', `${item.temperature} °C`)}
+                                        {renderLadleDetail('Last Measured', moment.utc(item.timestamp).local().fromNow())}
                                     </div>
                                     <button disabled={deleting} className='absolute top-[-10px] right-[-10px] bg-black bg-opacity-15 hover:bg-opacity-100 rounded-full h-5 w-5 p-4 flex items-center justify-center text-white' onClick={() => confirmRemoveLadle(item.id)}>
                                         <DeleteOutlined color='red' className='text-red-500' />

@@ -63,7 +63,6 @@ const EditCamera = ({ smsUnits, camera }) => {
             setIsModalOpen(false);
             window.location.reload();
         } catch (error) {
-            console.log(error)
             openNotification("Error updating camera!", 'error');
         } finally {
             setAdding(false);

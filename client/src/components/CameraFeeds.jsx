@@ -5,14 +5,13 @@ import { IoVideocamOff, IoVideocam } from "react-icons/io5";
 const CameraFeeds = ({ selectedUnit }) => {
     const [cameraFeeds, setCameraFeeds] = useState([]);
     const getCameraFeeds = async () => {
-        if(!selectedUnit) return;
+        if (!selectedUnit) return;
         try {
             const response = await axios.get(`/api/unitcameras/${selectedUnit}`);
             if (response?.data?.length > 0) {
                 setCameraFeeds(response.data);
             }
         } catch (error) {
-            console.log(error);
         }
     }
     useEffect(() => {
@@ -77,6 +76,7 @@ const CameraFeeds = ({ selectedUnit }) => {
                                             {renderCameraDetail('Ladle', item.ladle_details?.ladleId || '---')}
                                             {renderExpectedTemperature(item.ladle_details)}
                                             {renderCameraDetail(item.ladle_details ? 'Arrived' : 'Departed', moment.utc(item.timestamp).local().fromNow())}
+                                            {renderCameraDetail('Checked', moment.utc(item.last_detection).local().fromNow())}
                                         </div>
                                     ))}
                                 </div>
@@ -96,6 +96,7 @@ const CameraFeeds = ({ selectedUnit }) => {
                                     {renderCameraDetail('Ladle', item.ladle_details?.ladleId || '---')}
                                     {renderExpectedTemperature(item.ladle_details)}
                                     {renderCameraDetail(item.ladle_details ? 'Arrived' : 'Departed', moment.utc(item.timestamp).local().fromNow())}
+                                    {renderCameraDetail('Checked', moment.utc(item.last_detection).local().fromNow())}
                                 </div>
                             ))}
                         </div>

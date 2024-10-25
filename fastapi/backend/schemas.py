@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 
 class LadleHistoryBase(BaseModel):
-    cameraId: str
+    location: str
     ladleId: str
     temperature: float
     arrival_time: datetime

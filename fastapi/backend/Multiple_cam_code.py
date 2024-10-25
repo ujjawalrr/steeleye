@@ -5,12 +5,15 @@ from ultralytics import YOLO
 import statistics as stats
 import pymysql
 from pymysql import OperationalError
-from datetime import datetime
+from datetime import datetime, timezone
+from dotenv import dotenv_values
 
-host='localhost'
-database='steel-eye'
-user='ujjawal'
-password='ujjawal#25012002'
+values = dotenv_values()
+
+host = values['DB_HOST']
+user = values['DB_USER']
+password = values['DB_PASS']
+database = values['DB_SCHEMA']
 
 def insert_number_into_db(camera, detected_number):
     try:
@@ -23,9 +26,10 @@ def insert_number_into_db(camera, detected_number):
         camera_unitId = camera['unitId']
         previous_ladleId = camera['ladleId']
         camera_id = camera['id']
+        camera_location = camera['location']
         camera_timestamp = camera['timestamp']
         with connection.cursor() as cursor:
-            current_time = datetime.now()
+            current_time = datetime.now(timezone.utc)
             if detected_number == 0:
                 if(previous_ladleId != str(detected_number)):
                     if previous_ladleId != '0':
@@ -34,16 +38,16 @@ def insert_number_into_db(camera, detected_number):
                         results = cursor.fetchall()
                         if len(results) != 0:
                             ladle_temperature = results[0][6]
-                            measurement_time = results[0][7]
+                            measurement_time = results[0][7].replace(tzinfo=timezone.utc)  # Make measurement_time timezone-aware
                             time_difference = current_time - measurement_time
                             difference_in_minutes = time_difference.total_seconds() / 60
                             current_temperature = ladle_temperature - (difference_in_minutes * 10 / 15)
                             
                             insert_query = """
-                                INSERT INTO ladle_history (cameraId, ladleId, temperature, arrival_time, departure_time)
+                                INSERT INTO ladle_history (location, ladleId, temperature, arrival_time, departure_time)
                                 VALUES (%s, %s, %s, %s, %s)
                             """
-                            cursor.execute(insert_query, (camera_id, previous_ladleId, current_temperature, camera_timestamp, current_time))
+                            cursor.execute(insert_query, (camera_location, previous_ladleId, current_temperature, camera_timestamp, current_time))
                     
                     update_query = """
                         UPDATE camerafeeds
@@ -73,16 +77,16 @@ def insert_number_into_db(camera, detected_number):
                             cursor.execute(get_previous_ladle_query, (previous_ladleId))
                             previous_ladle_results = cursor.fetchall()
                             ladle_temperature = previous_ladle_results[0][6]
-                            measurement_time = previous_ladle_results[0][7]
+                            measurement_time = previous_ladle_results[0][7].replace(tzinfo=timezone.utc)  # Make measurement_time timezone-aware
                             time_difference = current_time - measurement_time
                             difference_in_minutes = time_difference.total_seconds() / 60
                             current_temperature = ladle_temperature - (difference_in_minutes * 10 / 15)
                             
                             insert_query = """
-                                INSERT INTO ladle_history (cameraId, ladleId, temperature, arrival_time, departure_time)
+                                INSERT INTO ladle_history (location, ladleId, temperature, arrival_time, departure_time)
                                 VALUES (%s, %s, %s, %s, %s)
                             """
-                            cursor.execute(insert_query, (camera_id, previous_ladleId, current_temperature, camera_timestamp, current_time))
+                            cursor.execute(insert_query, (camera_location, previous_ladleId, current_temperature, camera_timestamp, current_time))
                     
                         update_query = """
                             UPDATE camerafeeds
@@ -179,7 +183,7 @@ def main():
     
     try:
         with connection.cursor() as cursor:
-            get_query = "SELECT * FROM camerafeeds WHERE state = 1"
+            get_query = "SELECT * FROM camerafeeds WHERE state = 1 ORDER BY location"
             cursor.execute(get_query)
             results = cursor.fetchall()
             for row in results:
@@ -200,7 +204,9 @@ def main():
     finally:
         connection.close()
         
-    insert_number_into_db(cameras[0], 21)
+    # insert_number_into_db(cameras[0], 23)
+    insert_number_into_db(cameras[0], 0)
+    # insert_number_into_db(cameras[1], 24)
     
     # caps = [cv2.VideoCapture(url) for url in camera_urls]
     # num_lists = [[] for _ in camera_urls]

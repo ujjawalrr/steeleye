@@ -30,7 +30,6 @@ const ManageCameras = ({ smsUnits }) => {
                 setUnitCameras(response.data);
             }
         } catch (error) {
-            console.log(error);
         } finally {
             setGettingUnitCameras(false);
         }
@@ -95,8 +94,6 @@ const ManageCameras = ({ smsUnits }) => {
             openNotification("Error updating camera state!", "error");
         }
     }
-
-    console.log(unitCameras);
 
     return (
         <div className='px-4 sm:px-12 py-4 lg:py-8'>
