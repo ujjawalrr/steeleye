@@ -2,16 +2,25 @@ import React, { useEffect, useState } from 'react'
 import axios from 'axios'
 import moment from 'moment';
 import { IoVideocamOff, IoVideocam } from "react-icons/io5";
+import { ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined, DoubleLeftOutlined, DoubleRightOutlined, XOutlined } from '@ant-design/icons';
+import { Skeleton } from 'antd';
 const CameraFeeds = ({ selectedUnit }) => {
     const [cameraFeeds, setCameraFeeds] = useState([]);
+    const [untrackedLadles, setUntrackedLadles] = useState([]);
     const getCameraFeeds = async () => {
         if (!selectedUnit) return;
         try {
-            const response = await axios.get(`/api/unitcameras/${selectedUnit}`);
-            if (response?.data?.length > 0) {
-                setCameraFeeds(response.data);
+            const response = await axios.get(`/api/unitcamerafeeds/${selectedUnit}`);
+            if (response?.data?.camera_feeds) {
+                setCameraFeeds(response.data.camera_feeds);
+            }
+            if (response?.data?.untracked_ladles) {
+                setUntrackedLadles(response.data.untracked_ladles);
             }
         } catch (error) {
+            setCameraFeeds([]);
+            setUntrackedLadles([]);
+            console.log(error);
         }
     }
     useEffect(() => {
@@ -56,54 +65,144 @@ const CameraFeeds = ({ selectedUnit }) => {
             </div>
         );
     };
-    return (
-        <div className='p-4 flex flex-col w-full'>
-            <h1 className='text-center text-2xl mb-4'>Camera Feed</h1>
-            {cameraFeeds.length > 0 ?
-                <div className='space-y-16'>
-                    <div className="grid grid-cols-3 gap-8">
-                        {['BOF', 'LF', 'CCM'].map((subunit, index) => (
-                            <div key={index}>
-                                <h3 className='text-center pb-4 text-2xl font-semibold text-orange-950'>{subunit}</h3>
-                                <div className='space-y-4'>
-                                    {cameraFeeds.filter((item) => item.subunit === subunit).map((item, index) => (
-                                        <div key={index} className="p-4 border shadow-md rounded-xl">
-                                            <div className='text-center pb-2 text-xl font-medium text-orange-950'>{item.location}</div>
-                                            <div className="flex gap-8 justify-between items-end">
-                                                <span className='text-orange-950 font-semibold'>Status</span>
-                                                <button className='text-orange-950 text-3xl' onClick={() => toggleCameraState(item.id, item.state)}>{item.state ? <IoVideocam /> : <IoVideocamOff />}</button>
-                                            </div>
-                                            {renderCameraDetail('Ladle', item.ladle_details?.ladleId || '---')}
-                                            {renderExpectedTemperature(item.ladle_details)}
-                                            {renderCameraDetail(item.ladle_details ? 'Arrived' : 'Departed', moment.utc(item.timestamp).local().fromNow())}
-                                            {renderCameraDetail('Checked', moment.utc(item.last_detection).local().fromNow())}
-                                        </div>
-                                    ))}
-                                </div>
+    const renderUnit = (unit) => {
+        return (
+            <div>
+                <h3 className='text-center pb-4 text-2xl font-semibold text-orange-950'>{unit}</h3>
+                <div className='space-y-4 max-w-[400px] mx-auto'>
+                    {cameraFeeds.filter((item) => item.subunit === unit).map((item, index) => (
+                        <div key={index} className="p-4 border shadow-md rounded-xl">
+                            <div className="flex gap-8 justify-between items-center">
+                                <span className='text-orange-950 font-semibold'>{item.location}</span>
+                                <button className='text-orange-950 text-3xl' onClick={() => toggleCameraState(item.id, item.state)}>{item.state ? <IoVideocam /> : <IoVideocamOff />}</button>
                             </div>
-                        ))}
-                    </div>
-                    <div>
-                        {/* <h3 className='text-center pb-4 text-2xl font-semibold text-orange-950'>Ladle Preparation Bay</h3> */}
-                        <div className='space-y-4 max-w-[400px] mx-auto'>
-                            {cameraFeeds.filter((item) => item.subunit === 'Preparation Bay').map((item, index) => (
-                                <div key={index} className="p-4 border shadow-md rounded-xl">
-                                    <div className='text-center pb-2 text-xl font-medium text-orange-950'>{item.location}</div>
-                                    <div className="flex gap-8 justify-between items-end">
-                                        <span className='text-orange-950 font-semibold'>Status</span>
-                                        <button className='text-orange-950 text-3xl' onClick={() => toggleCameraState(item.id, item.state)}>{item.state ? <IoVideocam /> : <IoVideocamOff />}</button>
+                            {item.ladle_details ?
+                                <>
+                                    <div className='relative text-center my-4'>
+                                        <img className='h-[180px] mx-auto rounded-md z-10' src='/production-ladle.png' alt="" />
+                                        <p className='w-full h-full absolute top-[60px] z-20 text-white text-[60px] leading-[60px] font-semibold'>{item.ladle_details.ladleId}</p>
                                     </div>
-                                    {renderCameraDetail('Ladle', item.ladle_details?.ladleId || '---')}
                                     {renderExpectedTemperature(item.ladle_details)}
-                                    {renderCameraDetail(item.ladle_details ? 'Arrived' : 'Departed', moment.utc(item.timestamp).local().fromNow())}
-                                    {renderCameraDetail('Checked', moment.utc(item.last_detection).local().fromNow())}
+                                </>
+                                :
+                                <div className='text-center text-orange-950 text-[50px]'>
+                                    <XOutlined />
                                 </div>
-                            ))}
+                            }
+                            {renderCameraDetail(item.ladle_details ? 'Arrived' : 'Departed', moment.utc(item.timestamp).local().fromNow())}
+                            {renderCameraDetail('Checked', moment.utc(item.last_detection).local().fromNow())}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        );
+    };
+    const renderExpectedTemperatureForOnTheWay = (item) => {
+        const minElapsed = moment().diff(moment.utc(item.timestamp).local(), 'minutes');
+        const expectedTemp = (item.temperature - (minElapsed * 10 / 15)).toFixed(2);
+        return (
+            <p className='font-medium text-orange-950'>{expectedTemp > 0 ? `${expectedTemp} °C` : 'Measure Temp'}</p>
+        );
+    };
+    const mapImgUrl = (spot) => {
+        switch (spot) {
+            case 'MAINTAINANCE':
+                return '/maintainance-ladle.png';
+            case 'CCM':
+                return '/halted-ladle.png';
+            case 'NEW':
+                return '/halted-ladle.png';
+            default:
+                return "/production-ladle.png";
+        }
+    }
+    const renderUntrackedLadles = (spot) => {
+        return (
+            <div className='space-y-4'>
+                {untrackedLadles.filter((item) => item.location.startsWith(spot)).map((item) => (
+                    <div key={item.id} className='text-center border shadow-md rounded-xl p-1'>
+                        <div className='relative h-[180px]'>
+                            <img className='h-[180px] rounded-md z-10' src={mapImgUrl(spot)} alt="" />
+                            <p className='w-full h-full absolute top-[60px] z-20 text-white text-[60px] leading-[60px] font-semibold'>{item.ladleId}</p>
+                        </div>
+                        <div className='p-1 py-3'>
+                            {renderExpectedTemperatureForOnTheWay(item)}
+                            <p>{spot != 'MAINTAINANCE' ? item.location : item.name}</p>
+                            <p className='text-sm font-light'>{moment.utc(item.departure_time).local().fromNow()}</p>
                         </div>
                     </div>
-                </div>
+                ))}
+            </div>
+        );
+    }
+    return (
+        <div className='p-4 flex flex-col w-full'>
+            {selectedUnit ?
+                <>
+                    <h1 className='text-center text-2xl mb-4'>{selectedUnit} Live Status</h1>
+                    {cameraFeeds.length > 0 ?
+                        <div className='space-y-8'>
+                            <div className="flex justify-between w-full">
+                                {renderUnit('BOF')}
+                                <div className='flex gap-8 flex-col items-center pt-2'>
+                                    <div className='flex justify-between'>
+                                        <ArrowRightOutlined />
+                                        <span className='px-2'>Way to LF</span>
+                                        <ArrowRightOutlined />
+                                    </div>
+                                    {renderUntrackedLadles('BOF')}
+                                </div>
+                                {renderUnit('LF')}
+                                <div className='flex gap-8 flex-col items-center pt-2'>
+                                    <div className='flex justify-between'>
+                                        <ArrowRightOutlined />
+                                        <span className='px-2'>Way to CCM</span>
+                                        <ArrowRightOutlined />
+                                    </div>
+                                    {renderUntrackedLadles('LF')}
+                                </div>
+                                {renderUnit('CCM')}
+                            </div>
+                            <div className='flex justify-between'>
+                                <div className='text-center'>
+                                    <ArrowUpOutlined />
+                                    <h3 className='py-4'>Way to BOF</h3>
+                                    {renderUntrackedLadles('LPB')}
+                                </div>
+                                <div className='flex items-center justify-center h-stretch max-h-[410px]'>
+                                    <ArrowLeftOutlined />
+                                </div>
+                                <div className='pt-24'>
+                                    {renderUnit('Preparation Bay')}
+                                </div>
+                                <div className='flex items-center justify-center h-stretch max-h-[410px]'>
+                                    <DoubleLeftOutlined />
+                                    <DoubleRightOutlined />
+                                </div>
+                                <div className='pt-48'>
+                                    <h3 className='text-center pb-4'>Under Maintenance</h3>
+                                    {renderUntrackedLadles('MAINTAINANCE')}
+                                </div>
+                                <div className='flex items-center justify-center h-stretch max-h-[410px]'>
+                                    <DoubleLeftOutlined />
+                                    <DoubleRightOutlined />
+                                </div>
+                                <div className='text-center'>
+                                    <ArrowDownOutlined />
+                                    <h3 className='py-4'>Available</h3>
+                                    <div className='pb-4'>
+                                        {renderUntrackedLadles('NEW')}
+                                    </div>
+                                    {renderUntrackedLadles('CCM')}
+                                </div>
+                            </div>
+                        </div>
+                        :
+                        <p className='text-center'>No camera found</p>
+                    }
+                </>
                 :
-                <p className='text-center'>No camera found</p>
+                <Skeleton active />
             }
         </div>
     )

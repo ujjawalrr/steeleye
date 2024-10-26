@@ -16,8 +16,9 @@ class LadleMaintainanceHistory(Base):
     __tablename__ = "ladle_maintainance_history"
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()), index=True)
     ladleId = Column(String(36), index=True)
-    timestamp = Column(DateTime(timezone=True), server_default=func.now(), index=True)
+    assigned_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     maintainedBy = Column(String(36), index=True)
+    delivered_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
     
 class User(Base):
     __tablename__ = "user"

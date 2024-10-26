@@ -73,10 +73,6 @@ def get_db():
 def test_api():
     return "Welcome to Steel Eye!"
 
-@app.get("/api/camerafeeds", response_model=list[schemas.CameraFeed])
-def get_feeds(db: Session = Depends(get_db)):
-    return db.query(models.CameraFeed).all()
-
 @app.get("/api/users", response_model=list[schemas.User])
 def get_users(db: Session = Depends(get_db)):
     return db.query(models.User.id, models.User.name, models.User.email, models.User.role).order_by(asc(models.User.role)).all()
@@ -257,7 +253,6 @@ def toggle_camera_state(id: str, temperature: LadleTemperatureUpdate, db: Sessio
 
 @app.get("/api/unitcameras/{unitId}", response_model=list[CameraFeedWithLadle])
 def get_unit_cameras(unitId: str, db: Session = Depends(get_db)):
-    # Perform a LEFT JOIN between CameraFeed and Ladle on ladleId
     camerafeeds_with_ladle = (
         db.query(models.CameraFeed, models.Ladle)
         .outerjoin(models.Ladle, models.CameraFeed.ladleId == models.Ladle.id)
@@ -269,7 +264,6 @@ def get_unit_cameras(unitId: str, db: Session = Depends(get_db)):
     if not camerafeeds_with_ladle:
         raise HTTPException(status_code=404, detail="Cameras not found for the specified unit")
 
-    # Format the result to match the response model
     result = []
     for camera_feed, ladle in camerafeeds_with_ladle:
         camera_feed_data = {
@@ -291,12 +285,133 @@ def get_unit_cameras(unitId: str, db: Session = Depends(get_db)):
                 "weight": ladle.weight if ladle else None,
                 "temperature": ladle.temperature if ladle else None,
                 "timestamp": ladle.timestamp if ladle else None,
-            } if ladle else None  # Handle case when ladle is None
+            } if ladle else None
         }
         result.append(camera_feed_data)
 
     return result
 
+class UntrackedLadleResponse(BaseModel):
+    id: Optional[str]
+    location: Optional[str]
+    departure_time: Optional[datetime]
+    ladleId: Optional[str]
+    temperature: Optional[float]
+    timestamp: Optional[datetime]
+    name: Optional[str]
+    
+class CameraFeedResponse(BaseModel):
+    camera_feeds: Optional[list[CameraFeedWithLadle]]
+    untracked_ladles: Optional[list[UntrackedLadleResponse]]
+
+@app.get("/api/unitcamerafeeds/{unitId}", response_model=CameraFeedResponse)
+def get_unit_camerafeeds(unitId: str, db: Session = Depends(get_db)):
+    camerafeeds_with_ladle = (
+        db.query(models.CameraFeed, models.Ladle)
+        .outerjoin(models.Ladle, models.CameraFeed.ladleId == models.Ladle.id)
+        .filter(models.CameraFeed.unitId == unitId)
+        .order_by(asc(models.CameraFeed.location))
+        .all()
+    )
+    
+    if not camerafeeds_with_ladle:
+        raise HTTPException(status_code=404, detail="Cameras not found for the specified unit")
+
+    result = []
+    for camera_feed, ladle in camerafeeds_with_ladle:
+        camera_feed_data = {
+            "id": camera_feed.id,
+            "unitId": camera_feed.unitId,
+            "subunit": camera_feed.subunit,
+            "location": camera_feed.location,
+            "camera_url": camera_feed.camera_url,
+            "state": camera_feed.state,
+            "ladleId": camera_feed.ladleId,
+            "timestamp": camera_feed.timestamp,
+            "last_detection": camera_feed.last_detection,
+            "ladle_details": {
+                "id": ladle.id if ladle else None,
+                "unitId": ladle.unitId if ladle else None,
+                "ladleId": ladle.ladleId if ladle else None,
+                "grade": ladle.grade if ladle else None,
+                "capacity": ladle.capacity if ladle else None,
+                "weight": ladle.weight if ladle else None,
+                "temperature": ladle.temperature if ladle else None,
+                "timestamp": ladle.timestamp if ladle else None,
+            } if ladle else None
+        }
+        result.append(camera_feed_data)
+
+#     query = """SELECT 
+#     lh.ladleId AS id, 
+#     CASE 
+#         WHEN lm.ladleId IS NOT NULL THEN 'MAINTAINANCE' 
+#         ELSE lh.location 
+#     END AS location,
+#     lh.departure_time, 
+#     l.ladleId,
+#     l.temperature,
+#     l.timestamp
+# FROM ladle_history lh
+# JOIN ladles l ON lh.ladleId = l.id
+# JOIN (
+#     SELECT ladleId, MAX(departure_time) AS latest_departure_time
+#     FROM ladle_history
+#     GROUP BY ladleId
+# ) AS latest_ladle_history ON lh.ladleId = latest_ladle_history.ladleId
+#     AND lh.departure_time = latest_ladle_history.latest_departure_time
+# LEFT JOIN camerafeeds cf ON lh.ladleId = cf.ladleId
+# LEFT JOIN ladle_maintainance_history lm ON lh.ladleId = lm.ladleId 
+#     AND lm.delivered_at IS NULL
+# WHERE cf.ladleId IS NULL
+# AND l.unitId = '""" + unitId + "'"
+
+    query = """SELECT 
+    l.id, 
+    CASE 
+        WHEN lh.ladleId IS NULL THEN 'NEW'
+        WHEN lm.ladleId IS NOT NULL THEN 'MAINTAINANCE'
+        ELSE lh.location 
+    END AS location,
+    CASE 
+        WHEN lh.ladleId IS NULL THEN l.timestamp
+        WHEN lm.ladleId IS NOT NULL THEN lm.assigned_at
+        ELSE lh.departure_time
+    END AS departure_time,
+    l.ladleId,
+    l.temperature,
+    l.timestamp,
+    u.name
+FROM ladles l
+LEFT JOIN ladle_history lh ON l.id = lh.ladleId
+    AND lh.departure_time = (
+        SELECT MAX(departure_time)
+        FROM ladle_history
+        WHERE ladleId = l.id
+    )
+LEFT JOIN ladle_maintainance_history lm ON l.id = lm.ladleId 
+    AND lm.delivered_at IS NULL
+LEFT JOIN camerafeeds cf ON l.id = cf.ladleId
+LEFT JOIN user u ON lm.maintainedBy = u.id
+WHERE cf.ladleId IS NULL
+AND l.unitId = '""" + unitId + "'"
+
+    result2 = db.execute(text(query))
+    rows = result2.fetchall()
+    untracked_ladles = []
+    for row in rows:
+        untracked_ladle = UntrackedLadleResponse(
+            id=row[0],
+            location=row[1],
+            departure_time=row[2],
+            ladleId=row[3],
+            temperature=row[4],
+            timestamp=row[5],
+            name=row[6]
+        )
+        untracked_ladles.append(untracked_ladle)
+        
+    return CameraFeedResponse(camera_feeds = result, untracked_ladles = untracked_ladles)
 
 @app.post("/api/addNewCamera", response_model=schemas.CameraFeed)
 def add_new_camerafeed(camerafeed: schemas.CameraFeedCreate, db: Session = Depends(get_db)):
@@ -360,11 +475,62 @@ def get_ladle(id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Ladle not found")
     return ladle
 
-@app.get("/api/ladle-history/{id}", response_model=list[schemas.LadleHistory])
+class LadleMaintainanceHistoryResponse(BaseModel):
+    id: str
+    ladleId: str
+    assigned_at: datetime
+    maintainedBy: str
+    delivered_at: Optional[datetime]
+    maintainedBy_name: str
+    
+class LadleHistoryResponse(BaseModel):
+    ladleHistory: Optional[list[schemas.LadleHistory]]
+    ladleMaintainanceHistory: Optional[list[LadleMaintainanceHistoryResponse]]
+    
+@app.get("/api/ladle-history/{id}", response_model=LadleHistoryResponse)
 def get_ladle_history(id: str, db: Session = Depends(get_db)):
     history = db.query(models.LadleHistory).filter(models.LadleHistory.ladleId == id).order_by(desc(models.LadleHistory.departure_time)).all()
+    maintainance_history = db.query(models.LadleMaintainanceHistory, models.User.name).join(models.User, models.LadleMaintainanceHistory.maintainedBy == models.User.id).filter(models.LadleMaintainanceHistory.ladleId == id).order_by(desc(models.LadleMaintainanceHistory.assigned_at)).all()
+    maintainance_history_list = []
+    for maintainance, name in maintainance_history:
+        maintainance_history_list.append(LadleMaintainanceHistoryResponse(id=maintainance.id, ladleId=maintainance.ladleId, assigned_at=maintainance.assigned_at, maintainedBy=maintainance.maintainedBy, delivered_at=maintainance.delivered_at, maintainedBy_name=name))
+        
+    return LadleHistoryResponse(ladleHistory=history, ladleMaintainanceHistory=maintainance_history_list)
+        
+
+# @app.get("/api/ladle-maintainance-history/{id}", response_model=list[schemas.LadleMaintainanceHistory])
+# def get_ladle_maintainance_history(id: str, db: Session = Depends(get_db)):
+#     history = db.query(models.LadleMaintainanceHistory).filter(models.LadleMaintainanceHistory.ladleId == id).order_by(desc(models.LadleMaintainanceHistory.assigned_at)).all()
+#     if not history:
+#         raise HTTPException(status_code=404, detail="Maintainance history not found for the specified ladle")
+#     return history
+
+@app.post("/api/assign-ladle-maintainance", response_model=schemas.LadleMaintainanceHistory)
+def assign_ladle_maintainance(maintainance: schemas.LadleMaintainanceHistoryCreate, db: Session = Depends(get_db)):
+    db_maintainance = models.LadleMaintainanceHistory(**maintainance.dict())
+    
+    db.add(db_maintainance)
+    
+    db.commit()
+    
+    db.refresh(db_maintainance)
+    
+    return db_maintainance
+
+class Time(BaseModel):
+    time: datetime
+
+@app.put("/api/maintain-ladle/{id}", response_model=schemas.LadleMaintainanceHistory)
+def maintain_ladle(id: str, time: Time, db: Session = Depends(get_db)):
+    history = db.query(models.LadleMaintainanceHistory).filter(models.LadleMaintainanceHistory.id == id).first()
+    
     if not history:
-        raise HTTPException(status_code=404, detail="History not found for the specified ladle")
+        raise HTTPException(status_code=404, detail="History not found")
+    
+    history.delivered_at = time.time
+    db.commit()
+    db.refresh(history)
+    
     return history
 
 # @app.get("/api/cycle-count/{id}", response_model=int)
@@ -437,8 +603,6 @@ def sql_query(sql, db: Session):
             for i in range(len(column_list)):
                 row_dict[column_list[i]] = row[i]
             row_final.append(row_dict)
-        print("row_list", row_list)
-        print("row_final", row_final)
         return {'columns': column_list, 'rows': row_final}
 
     except Exception as e:

@@ -47,7 +47,7 @@ const EditTemperature = ({ ladleData, updateLadleData }) => {
 
     return (
         <>
-            <button onClick={showModal} className='bg-orange-950 text-white rounded-md px-4 py-3'>Edit Temperature</button>
+            <button onClick={showModal} className='bg-orange-950 text-white rounded-md px-3 py-2'>Edit Temperature</button>
             <Modal title="Edit Temperature" footer={null} onCancel={() => setIsModalOpen(false)} open={isModalOpen}>
                 <form className='flex flex-col gap-2' onSubmit={handleSubmit}>
                     <div className='flex justify-center items-center gap-2'>

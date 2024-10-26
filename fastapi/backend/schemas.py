@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional
 
 class LadleHistoryBase(BaseModel):
     location: str
@@ -10,8 +11,9 @@ class LadleHistoryBase(BaseModel):
     
 class LadleMaintainanceHistoryBase(BaseModel):
     ladleId: str
-    timestamp: datetime
+    assigned_at: datetime
     maintainedBy: str
+    delivered_at: Optional[datetime]
     
 class UserBase(BaseModel):
     name: str

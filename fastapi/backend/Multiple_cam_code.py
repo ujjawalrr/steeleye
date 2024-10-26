@@ -204,9 +204,11 @@ def main():
     finally:
         connection.close()
         
-    # insert_number_into_db(cameras[0], 23)
     insert_number_into_db(cameras[0], 0)
-    # insert_number_into_db(cameras[1], 24)
+    # insert_number_into_db(cameras[1], 0)
+    # insert_number_into_db(cameras[1], 23)
+    # insert_number_into_db(cameras[1], 21)
+    # insert_number_into_db(cameras[2], 0)
     
     # caps = [cv2.VideoCapture(url) for url in camera_urls]
     # num_lists = [[] for _ in camera_urls]

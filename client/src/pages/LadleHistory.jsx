@@ -5,8 +5,11 @@ import { useParams } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import moment from 'moment';
 import EditTemperature from '../components/EditTemperature';
+import AddMaintainance from '../components/AddMaintainance';
+import { useAuth } from '../AuthContext';
 
 const LadleHistory = ({ smsUnits }) => {
+    const { user } = useAuth();
     const [selectedUnit, setSelectedUnit] = useState('');
     const updateSelectedUnit = (value) => {
         setSelectedUnit(value);
@@ -18,6 +21,10 @@ const LadleHistory = ({ smsUnits }) => {
     }, [smsUnits]);
     const params = useParams();
     const [history, setHistory] = useState([]);
+    const [maintainanceHistory, setMaintainanceHistory] = useState([]);
+    const updateMaintainanceHistory = (data) => {
+        setMaintainanceHistory(data);
+    };
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
     // const [cycleCount, setCycleCount] = useState();
@@ -45,7 +52,8 @@ const LadleHistory = ({ smsUnits }) => {
             setHistory([]);
             setError(false);
             const response = await axios.get(`/api/ladle-history/${params.id}`);
-            setHistory(response.data);
+            setHistory(response.data.ladleHistory);
+            setMaintainanceHistory(response.data.ladleMaintainanceHistory);
         } catch (error) {
             setError(error.response.data.detail || "History not found!");
         } finally {
@@ -67,6 +75,19 @@ const LadleHistory = ({ smsUnits }) => {
         params.id && getHistory();
         // params.id && getCycleCount();
     }, [params.id]);
+    const [markingDelivered, setMarkingDelivered] = useState(false);
+    const markDelivered = async (historyId) => {
+        try {
+            setMarkingDelivered(true);
+            const data = { time: new Date() }
+            const response = await axios.put(`/api/maintain-ladle/${historyId}`, data);
+            setMaintainanceHistory(maintainanceHistory.map(item => item.id === historyId ? { ...item, delivered_at: data.time } : item));
+        } catch (error) {
+            console.log(error)
+        } finally {
+            setMarkingDelivered(false);
+        }
+    };
 
     const columns = [
         {
@@ -88,6 +109,32 @@ const LadleHistory = ({ smsUnits }) => {
             title: 'Departure Time',
             dataIndex: 'departure_time',
             key: 'departure_time',
+        }
+    ];
+
+    const maintainanceColumns = [
+        {
+            title: 'Maintained By',
+            dataIndex: 'maintainedBy_name',
+            key: 'maintainedBy',
+        },
+        {
+            title: 'Assigned At',
+            dataIndex: 'assigned_at',
+            key: 'assigned_at',
+        },
+        {
+            title: 'Delivered At',
+            key: 'delivered_at',
+            render: (_, record) => (
+                record.delivered_at != '---' ?
+                    <span>{record.delivered_at}</span>
+                    :
+                    (user.role === 'admin' || record.maintainedBy == user.id) ?
+                        <button disabled={markingDelivered} onClick={() => markDelivered(record.key)} className='px-2 py-1 rounded-md bg-orange-950 text-white'>{markingDelivered ? 'Delivering' : 'Deliver Now'}</button>
+                        :
+                        <span>{record.delivered_at}</span>
+            )
         }
     ];
 
@@ -116,31 +163,31 @@ const LadleHistory = ({ smsUnits }) => {
                 {(fetchingLadleData || loading) ?
                     <Skeleton active />
                     :
-                    <div className='space-y-8'>
+                    ladleData ? <div className='space-y-8'>
                         <div className='flex items-center justify-between gap-16'>
-                            <div className="space-y-4 text-center">
+                            <div className="flex-1 max-w-[250px] flex flex-col gap-2 text-center">
                                 <div className="text-[160px] leading-[160px] font-semibold text-orange-950">{ladleData.ladleId}</div>
                                 <div className="">Ladle Number</div>
+                                {(maintainanceHistory.length && !maintainanceHistory[0].delivered_at)
+                                    ?
+                                    (user.role === 'admin' || maintainanceHistory[0].maintainedBy == user.id) ?
+                                        <button disabled={markingDelivered} onClick={() => markDelivered(maintainanceHistory[0].id)} className='bg-red-800 text-white rounded-md px-3 py-2'>{markingDelivered ? 'Delivering' : 'Deliver Now'}</button>
+                                        :
+                                        <p className='text-red-500'>Ladle is under maintainance</p>
+                                    :
+                                    <AddMaintainance ladleId={ladleData.id} maintainanceHistory={maintainanceHistory} updateMaintainanceHistory={updateMaintainanceHistory} />
+                                }
+                                <EditTemperature ladleData={ladleData} updateLadleData={updateLadleData} />
                             </div>
-                            <div className="flex-1">
-                                <div className='p-4 space-y-2 max-w-[450px] w-full'>
-                                    {renderLadleDetail('Grade', ladleData.grade || '----')}
-                                    {renderLadleDetail('Capacity', `${ladleData.capacity} tonn`)}
-                                    {renderLadleDetail('Weight', `${ladleData.weight} kg`)}
-                                    {renderExpectedTemperature(ladleData)}
-                                    {renderLadleDetail('Measured Temperature', `${ladleData.temperature} °C`)}
-                                    {renderLadleDetail('Last Measured', moment.utc(ladleData.timestamp).local().fromNow())}
-                                </div>
-                            </div>
-                            <div className='spacey-y-4'>
-                                {/* <div>
-                                    <div className='text-center text-2xl font-medium text-orange-950'>Cycle Count</div>
-                                    <div className='text-center text-4xl font-semibold text-orange-950'>{history.filter(item => item.location.startsWith('CCM ')).length}</div>
-                                </div> */}
-                                {renderLadleDetail('Cycle', history.filter(item => item.location.startsWith('CCM ')).length)}
-                                <div className='pt-4'>
-                                    <EditTemperature ladleData={ladleData} updateLadleData={updateLadleData} />
-                                </div>
+                            <div className='p-4 space-y-2 w-[450px]'>
+                                {renderLadleDetail('Grade', ladleData.grade || '----')}
+                                {renderLadleDetail('Capacity', `${ladleData.capacity} tonn`)}
+                                {renderLadleDetail('Weight', `${ladleData.weight} kg`)}
+                                {renderExpectedTemperature(ladleData)}
+                                {renderLadleDetail('Measured Temperature', `${ladleData.temperature} °C`)}
+                                {renderLadleDetail('Last Measured', moment.utc(ladleData.timestamp).local().fromNow())}
+                                {renderLadleDetail('Total Cycles', history.filter(item => item.location.startsWith('CCM ')).length)}
+                                {renderLadleDetail('Total Maintainance', (maintainanceHistory.length && !maintainanceHistory[0].delivered_at) ? maintainanceHistory.length - 1 : maintainanceHistory.length)}
                             </div>
                         </div>
                         <div className='space-y-6'>
@@ -156,10 +203,29 @@ const LadleHistory = ({ smsUnits }) => {
                                     arrival_time: moment.utc(item.arrival_time).local().format('YYYY-MM-DD HH:mm:ss'),
                                     departure_time: moment.utc(item.departure_time).local().format('YYYY-MM-DD HH:mm:ss'),
                                 }))}
-                                pagination={history.length > 50 ? { pageSize: 50 } : false}
+                                pagination={history.length > 40 ? { pageSize: 40 } : false}
+                            />
+                        </div>
+                        <div className='space-y-6'>
+                            <h1 className='text-center text-2xl font-medium text-orange-950'>Maintainance History</h1>
+                            <Table
+                                className='w-full'
+                                size="small"
+                                columns={maintainanceColumns}
+                                dataSource={maintainanceHistory.map((item) => ({
+                                    key: item.id,
+                                    id: item.id,
+                                    assigned_at: moment.utc(item.assigned_at).local().format('YYYY-MM-DD HH:mm:ss'),
+                                    maintainedBy: item.maintainedBy,
+                                    delivered_at: item.delivered_at ? moment.utc(item.delivered_at).local().format('YYYY-MM-DD HH:mm:ss') : '---',
+                                    maintainedBy_name: item.maintainedBy_name
+                                }))}
+                                pagination={history.length > 40 ? { pageSize: 40 } : false}
                             />
                         </div>
                     </div>
+                        :
+                        <p className='text-center'>Ladle not found</p>
                 }
             </div>
         </main>
