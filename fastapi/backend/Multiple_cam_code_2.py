@@ -169,15 +169,18 @@ def model_pred(img, model):
         print("No number detected")
         return img, num
 
-def fetch_camera_feeds():
-    connection = pymysql.connect(
-        host=host,
-        database=database,
-        user=user,
-        password=password
-    )
-    cameras = []
+def main():
+    model_path = './weights/best.pt'
+    model = YOLO(model_path)
     camera_urls = []
+    cameras = []
+    connection = pymysql.connect(
+            host=host,
+            database=database,
+            user=user,
+            password=password
+        )
+    
     try:
         with connection.cursor() as cursor:
             get_query = "SELECT * FROM camerafeeds WHERE state = 1 ORDER BY location"
@@ -197,35 +200,21 @@ def fetch_camera_feeds():
                 if(row[4] == '0'):
                     camera_urls.append(0)
                 else:
-                    camera_urls.append(row[4]) 
+                    camera_urls.append(row[4])    
     finally:
         connection.close()
-    return cameras, camera_urls
-
-def main():
-    model_path = './weights/best.pt'
-    model = YOLO(model_path)
-    cameras, camera_urls = fetch_camera_feeds()
-    caps = [cv2.VideoCapture(url) for url in camera_urls if url is not None]
+        
+    caps = [cv2.VideoCapture(url) for url in camera_urls]
     num_lists = [[] for _ in camera_urls]
     c = 1
 
     while True:
-        new_cameras, new_camera_urls = fetch_camera_feeds()
-        
-        if new_camera_urls != camera_urls:
-            print("Camera feeds updated.")
-            for cap in caps:
-                cap.release()
-            caps = [cv2.VideoCapture(url) for url in new_camera_urls if url is not None]
-            camera_urls = new_camera_urls
-            cameras = new_cameras
-            num_lists = [[] for _ in camera_urls]
-
+        print(f'Frame {c}')
         for i, cap in enumerate(caps):
             ret, frame = cap.read()
             if not ret:
                 continue
+            
             fps = cap.get(cv2.CAP_PROP_FPS)
             frame = imutils.resize(frame, width=800, height=800)
             
@@ -248,7 +237,7 @@ def main():
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
-
+    
     for cap in caps:
         cap.release()
     cv2.destroyAllWindows()

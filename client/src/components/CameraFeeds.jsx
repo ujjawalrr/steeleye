@@ -5,6 +5,7 @@ import { IoVideocamOff, IoVideocam } from "react-icons/io5";
 import { ArrowDownOutlined, ArrowLeftOutlined, ArrowRightOutlined, ArrowUpOutlined, DoubleLeftOutlined, DoubleRightOutlined, XOutlined } from '@ant-design/icons';
 import { Skeleton } from 'antd';
 const CameraFeeds = ({ selectedUnit }) => {
+    const [loading, setLoading] = useState(true);
     const [cameraFeeds, setCameraFeeds] = useState([]);
     const [untrackedLadles, setUntrackedLadles] = useState([]);
     const getCameraFeeds = async () => {
@@ -20,7 +21,8 @@ const CameraFeeds = ({ selectedUnit }) => {
         } catch (error) {
             setCameraFeeds([]);
             setUntrackedLadles([]);
-            console.log(error);
+        } finally {
+            setLoading(false);
         }
     }
     useEffect(() => {
@@ -140,65 +142,66 @@ const CameraFeeds = ({ selectedUnit }) => {
             {selectedUnit ?
                 <>
                     <h1 className='text-center text-2xl mb-4'>{selectedUnit} Live Status</h1>
-                    {cameraFeeds.length > 0 ?
-                        <div className='space-y-8'>
-                            <div className="flex justify-between w-full">
-                                {renderUnit('BOF')}
-                                <div className='flex gap-8 flex-col items-center pt-2'>
-                                    <div className='flex justify-between'>
-                                        <ArrowRightOutlined />
-                                        <span className='px-2'>Way to LF</span>
-                                        <ArrowRightOutlined />
+                    {loading ? <Skeleton active /> :
+                        cameraFeeds.length > 0 ?
+                            <div className='space-y-8'>
+                                <div className="flex justify-between w-full">
+                                    {renderUnit('BOF')}
+                                    <div className='flex gap-8 flex-col items-center pt-2'>
+                                        <div className='flex justify-between'>
+                                            <ArrowRightOutlined />
+                                            <span className='px-2'>Way to LF</span>
+                                            <ArrowRightOutlined />
+                                        </div>
+                                        {renderUntrackedLadles('BOF')}
                                     </div>
-                                    {renderUntrackedLadles('BOF')}
-                                </div>
-                                {renderUnit('LF')}
-                                <div className='flex gap-8 flex-col items-center pt-2'>
-                                    <div className='flex justify-between'>
-                                        <ArrowRightOutlined />
-                                        <span className='px-2'>Way to CCM</span>
-                                        <ArrowRightOutlined />
+                                    {renderUnit('LF')}
+                                    <div className='flex gap-8 flex-col items-center pt-2'>
+                                        <div className='flex justify-between'>
+                                            <ArrowRightOutlined />
+                                            <span className='px-2'>Way to CCM</span>
+                                            <ArrowRightOutlined />
+                                        </div>
+                                        {renderUntrackedLadles('LF')}
                                     </div>
-                                    {renderUntrackedLadles('LF')}
+                                    {renderUnit('CCM')}
                                 </div>
-                                {renderUnit('CCM')}
+                                <div className='flex justify-between'>
+                                    <div className='text-center'>
+                                        <ArrowUpOutlined />
+                                        <h3 className='py-4'>Way to BOF</h3>
+                                        {renderUntrackedLadles('LPB')}
+                                    </div>
+                                    <div className='flex items-center justify-center h-stretch max-h-[410px]'>
+                                        <ArrowLeftOutlined />
+                                    </div>
+                                    <div className='pt-24'>
+                                        {renderUnit('Preparation Bay')}
+                                    </div>
+                                    <div className='flex items-center justify-center h-stretch max-h-[410px]'>
+                                        <DoubleLeftOutlined />
+                                        <DoubleRightOutlined />
+                                    </div>
+                                    <div className='pt-48'>
+                                        <h3 className='text-center pb-4'>Under Maintenance</h3>
+                                        {renderUntrackedLadles('MAINTAINANCE')}
+                                    </div>
+                                    <div className='flex items-center justify-center h-stretch max-h-[410px]'>
+                                        <DoubleLeftOutlined />
+                                        <DoubleRightOutlined />
+                                    </div>
+                                    <div className='text-center'>
+                                        <ArrowDownOutlined />
+                                        <h3 className='py-4'>Available</h3>
+                                        <div className='pb-4'>
+                                            {renderUntrackedLadles('NEW')}
+                                        </div>
+                                        {renderUntrackedLadles('CCM')}
+                                    </div>
+                                </div>
                             </div>
-                            <div className='flex justify-between'>
-                                <div className='text-center'>
-                                    <ArrowUpOutlined />
-                                    <h3 className='py-4'>Way to BOF</h3>
-                                    {renderUntrackedLadles('LPB')}
-                                </div>
-                                <div className='flex items-center justify-center h-stretch max-h-[410px]'>
-                                    <ArrowLeftOutlined />
-                                </div>
-                                <div className='pt-24'>
-                                    {renderUnit('Preparation Bay')}
-                                </div>
-                                <div className='flex items-center justify-center h-stretch max-h-[410px]'>
-                                    <DoubleLeftOutlined />
-                                    <DoubleRightOutlined />
-                                </div>
-                                <div className='pt-48'>
-                                    <h3 className='text-center pb-4'>Under Maintenance</h3>
-                                    {renderUntrackedLadles('MAINTAINANCE')}
-                                </div>
-                                <div className='flex items-center justify-center h-stretch max-h-[410px]'>
-                                    <DoubleLeftOutlined />
-                                    <DoubleRightOutlined />
-                                </div>
-                                <div className='text-center'>
-                                    <ArrowDownOutlined />
-                                    <h3 className='py-4'>Available</h3>
-                                    <div className='pb-4'>
-                                        {renderUntrackedLadles('NEW')}
-                                    </div>
-                                    {renderUntrackedLadles('CCM')}
-                                </div>
-                            </div>
-                        </div>
-                        :
-                        <p className='text-center'>No camera found</p>
+                            :
+                            <p className='text-center'>No camera found</p>
                     }
                 </>
                 :
