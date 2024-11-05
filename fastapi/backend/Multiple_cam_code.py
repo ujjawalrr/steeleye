@@ -204,19 +204,11 @@ def main():
     finally:
         connection.close()
         
-    insert_number_into_db(cameras[0], 0)
-    # insert_number_into_db(cameras[1], 0)
-    # insert_number_into_db(cameras[1], 23)
-    # insert_number_into_db(cameras[1], 21)
-    # insert_number_into_db(cameras[2], 0)
-    
-    # caps = [cv2.VideoCapture(url) for url in camera_urls]
-    # num_lists = [[] for _ in camera_urls]
-    caps = []
-    num_lists = []
+    caps = [cv2.VideoCapture(url) for url in camera_urls]
+    num_lists = [[] for _ in camera_urls]
     c = 1
 
-    while False:
+    while True:
         for i, cap in enumerate(caps):
             ret, frame = cap.read()
             if not ret:
@@ -240,9 +232,7 @@ def main():
                 num_mode = stats.mode(num_list)
                 num_lists[i] = []
                 print(f'Camera {i+1}: {num_list} Mode of detected numbers {num_mode}')
-                # print(camera_urls[i])
-                # insert this number in mysql db
-                # insert_number_into_db(cameras[i], num_mode)
+                insert_number_into_db(cameras[i], num_mode)
 
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break

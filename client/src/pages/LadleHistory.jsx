@@ -109,6 +109,11 @@ const LadleHistory = ({ smsUnits }) => {
             title: 'Departure Time',
             dataIndex: 'departure_time',
             key: 'departure_time',
+        },
+        {
+            title: 'Processing Time (min)',
+            dataIndex: 'processing_time',
+            key: 'processing_time'
         }
     ];
 
@@ -202,6 +207,7 @@ const LadleHistory = ({ smsUnits }) => {
                                     temperature: item.temperature,
                                     arrival_time: moment.utc(item.arrival_time).local().format('YYYY-MM-DD HH:mm:ss'),
                                     departure_time: moment.utc(item.departure_time).local().format('YYYY-MM-DD HH:mm:ss'),
+                                    processing_time: moment.utc(item.departure_time).local().diff(moment.utc(item.arrival_time).local(), 'minutes')
                                 }))}
                                 pagination={history.length > 40 ? { pageSize: 40 } : false}
                             />

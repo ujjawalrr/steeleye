@@ -85,7 +85,7 @@ const CameraFeeds = ({ selectedUnit }) => {
                                     {renderExpectedTemperature(item.ladle_details)}
                                 </>
                                 :
-                                <div className='text-center text-orange-950 text-[50px]'>
+                                <div className='text-center text-red-700 text-[50px]'>
                                     <XOutlined />
                                 </div>
                             }
