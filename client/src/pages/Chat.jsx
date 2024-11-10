@@ -1,11 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { Select, Switch, Input, Tooltip, Skeleton, Badge, Card, Table, Steps, notification } from "antd";
-import { DownloadOutlined, HistoryOutlined, TwitchOutlined } from "@ant-design/icons";
+import { Input, Tooltip, Skeleton, Badge, Card, Table, notification } from "antd";
+import { DownloadOutlined, TwitchOutlined } from "@ant-design/icons";
 import axios from "axios";
-import { useNavigate, Link, useLocation } from "react-router-dom";
-// import SchemaDrawer from "../components/SchemaDrawer";
-// import SQLQueryModal from "../components/SQLQueryModal";
-// import VisualiserModal from "../components/Home/Graphs/VisualiserModal";
 import { saveAs } from "file-saver";
 import Papa from "papaparse";
 import { v4 as uuidv4 } from "uuid";
@@ -23,23 +19,11 @@ const Chat = () => {
     const scrollableRef = useRef(null);
     const [chatMessages, setChatMessages] = useState([]);
     const [newMessage, setNewMessage] = useState(null);
-    //   const navigate = useNavigate();
-    //   const location = useLocation();
-    //   const searchParams = new URLSearchParams(location.search);
-    //   const [ThreadID, setThreadID] = useState(
-    //     searchParams.get("ThreadID") || null
-    //   );
-    //   useEffect(() => {
-    //     setThreadID(searchParams.get("ThreadID"));
-    //   }, [location.search]);
 
-    //   const [isChatting, setIsChatting] = useState(ThreadID ? true : false);
-    //   const [savedQueries, setSavedQueries] = useState([]);
     const [userQuestion, setUserQuestion] = useState(null);
     const [receivingResponse, setReceivingResponse] = useState(false);
     const handleChat = async () => {
         if (!userQuestion) return openNotification('Please enter your question!', 'error');
-        // setIsChatting(true);
         setReceivingResponse(true);
         try {
             setChatMessages([
@@ -50,11 +34,11 @@ const Chat = () => {
                     timestamp: new Date(),
                 },
             ]);
+            setUserQuestion("");
             const res = await axios.post(
                 `/api/message`,
                 { message: userQuestion }
             );
-            setUserQuestion("");
             setNewMessage(res.data.newMessage);
         } catch (error) {
             openNotification(error.response.data.message, "error");
@@ -73,16 +57,6 @@ const Chat = () => {
         }
     }, [chatMessages]);
 
-    console.log(chatMessages);
-
-    // const handleNewChat = () => {
-    //     setReceivingResponse(false);
-    //     // setIsChatting(false);
-    //     setChatMessages([]);
-    //     setNewMessage(null);
-    //     navigate("/chat");
-    // };
-
     useEffect(() => {
         window.scrollTo(0, 0);
         if (scrollableRef.current) {
@@ -99,16 +73,11 @@ const Chat = () => {
         saveAs(blob, `table-${uuidv4()}.csv`);
     };
 
-    // const handleNavigate = (path) => {
-    //     setReceivingResponse(false);
-    //     navigate(path);
-    // }
-
     return (
         <main className="w-full h-[calc(100vh-80px)]">
             {contextHolder}
             <div className="flex w-full h-[calc(100vh-80px)]">
-                <div className="md:p-4 w-full max-w-3xl mx-auto flex h-[calc(100vh-80px)]">
+                <div className="md:p-4 w-full mx-auto flex h-[calc(100vh-80px)]">
                     <div className="flex flex-col justify-between md:border-2 md:border-black rounded-md h-stretch w-full">
                         <div
                             ref={scrollableRef}
@@ -141,19 +110,6 @@ const Chat = () => {
                                                                         className="cursor-pointer z-30 hover:text-[#fa9111]  transition-all duration-300 ease-in-out transform hover:scale-110 text-xl"
                                                                     />
                                                                 </Tooltip>
-                                                                {/* <SQLQueryModal
-                                                                    data={message?.message}
-                                                                    assistantId={message?.senderID}
-                                                                    index={index}
-                                                                    updateData={
-                                                                        handleUpdateData
-                                                                    }
-                                                                    updateSavedQueries={updateSavedQueries}
-                                                                    savedQueries={savedQueries}
-                                                                /> */}
-                                                                {/* <VisualiserModal
-                                                                    data={message?.message}
-                                                                /> */}
                                                             </div>
                                                         </>
                                                     ) : message.sender === "user" ? (
@@ -255,36 +211,24 @@ const Chat = () => {
                                     </div>
                                 ))}
                                 {receivingResponse && (
-                                    // <>
-                                    //     {statusState && statusState.length > 0 ? (
-                                    //         <div className="flex flex-col justify-center items-center gap-2">
-                                    //             <Steps
-                                    //                 size="small"
-                                    //                 items={statusState.map((status, index) => ({
-                                    //                     key: index,
-                                    //                     title: status.status || status.message,
-                                    //                     description: status.error,
-                                    //                 }))}
-                                    //                 direction="vertical"
-                                    //                 current={statusState.length - 1}
-                                    //             />
-                                    //         </div>
-                                    //     ) : (
-                                    //         <div className="flex justify-center items-center gap-2">
-                                    //             <Skeleton.Avatar active />
-                                    //             <Skeleton.Input active />
-                                    //         </div>
-                                    //     )}
-                                    // </>
                                     <div className="flex justify-center items-center gap-2">
                                         <Skeleton.Avatar active />
                                         <Skeleton.Input active />
                                     </div>
                                 )}
+                                {chatMessages.length === 0 &&
+                                    <div className="flex flex-col justify-center items-center gap-4 bg-slate-50 p-4 rounded-md text-center max-w-lg mx-auto">
+                                        <div className="text-lg">
+                                            Write your question in detail. Always mention the unitId in your question.
+                                        </div>
+                                        <div className="text-orange-950">
+                                            e.g. For unitId SMS 1, tell me the location history of ladle 25.
+                                        </div>
+                                    </div>
+                                }
                             </div>
                         </div>
                         <div className="flex px-2 md:px-8 py-4 items-center gap-2">
-                            {/* <SchemaDrawer /> */}
                             <Input
                                 className="md:ml-4"
                                 onKeyDown={(e) => e.key === "Enter" && handleChat()}

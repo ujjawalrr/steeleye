@@ -342,30 +342,6 @@ def get_unit_camerafeeds(unitId: str, db: Session = Depends(get_db)):
         }
         result.append(camera_feed_data)
 
-#     query = """SELECT 
-#     lh.ladleId AS id, 
-#     CASE 
-#         WHEN lm.ladleId IS NOT NULL THEN 'MAINTAINANCE' 
-#         ELSE lh.location 
-#     END AS location,
-#     lh.departure_time, 
-#     l.ladleId,
-#     l.temperature,
-#     l.timestamp
-# FROM ladle_history lh
-# JOIN ladles l ON lh.ladleId = l.id
-# JOIN (
-#     SELECT ladleId, MAX(departure_time) AS latest_departure_time
-#     FROM ladle_history
-#     GROUP BY ladleId
-# ) AS latest_ladle_history ON lh.ladleId = latest_ladle_history.ladleId
-#     AND lh.departure_time = latest_ladle_history.latest_departure_time
-# LEFT JOIN camerafeeds cf ON lh.ladleId = cf.ladleId
-# LEFT JOIN ladle_maintainance_history lm ON lh.ladleId = lm.ladleId 
-#     AND lm.delivered_at IS NULL
-# WHERE cf.ladleId IS NULL
-# AND l.unitId = '""" + unitId + "'"
-
     query = """SELECT 
     l.id, 
     CASE 
@@ -496,14 +472,6 @@ def get_ladle_history(id: str, db: Session = Depends(get_db)):
         maintainance_history_list.append(LadleMaintainanceHistoryResponse(id=maintainance.id, ladleId=maintainance.ladleId, assigned_at=maintainance.assigned_at, maintainedBy=maintainance.maintainedBy, delivered_at=maintainance.delivered_at, maintainedBy_name=name))
         
     return LadleHistoryResponse(ladleHistory=history, ladleMaintainanceHistory=maintainance_history_list)
-        
-
-# @app.get("/api/ladle-maintainance-history/{id}", response_model=list[schemas.LadleMaintainanceHistory])
-# def get_ladle_maintainance_history(id: str, db: Session = Depends(get_db)):
-#     history = db.query(models.LadleMaintainanceHistory).filter(models.LadleMaintainanceHistory.ladleId == id).order_by(desc(models.LadleMaintainanceHistory.assigned_at)).all()
-#     if not history:
-#         raise HTTPException(status_code=404, detail="Maintainance history not found for the specified ladle")
-#     return history
 
 @app.post("/api/assign-ladle-maintainance", response_model=schemas.LadleMaintainanceHistory)
 def assign_ladle_maintainance(maintainance: schemas.LadleMaintainanceHistoryCreate, db: Session = Depends(get_db)):
@@ -533,18 +501,6 @@ def maintain_ladle(id: str, time: Time, db: Session = Depends(get_db)):
     
     return history
 
-# @app.get("/api/cycle-count/{id}", response_model=int)
-# def get_cycle_count(id: str, db: Session = Depends(get_db)):
-#     count = db.query(func.count()).filter(
-#         (models.LadleHistory.ladleId == id) &
-#         (models.LadleHistory.location.like("CCM %"))
-#     ).scalar()
-
-#     if count == 0:
-#         raise HTTPException(status_code=404, detail="No history found for the specified ladle")
-
-#     return count
-
 class MessageRequest(BaseModel):
     message: str
 
@@ -573,20 +529,56 @@ def get_completion(messages):
             api_version=api_version,
             azure_endpoint=azure_endpoint
         )
-        # print(messages)
         completion = client.chat.completions.create(
             model=deployment,
             messages=messages
         )
         return completion.choices[0].message.content
     except Exception as e:
-        print(f"OpenAI API error: {e}")
         raise e
 
 
 def get_context(question):
     # TODO: Add some custom queries
-    context = []
+    context = [
+        {
+            "Question": "For unitId SMS 1, Tell me maintainance history of ladle 25?",
+            "Query": """SELECT
+    u.name AS 'Maintained By',
+    lm.assigned_at AS 'Assigned At',
+    lm.delivered_at AS 'Delivered At'
+FROM 
+    ladles l
+JOIN 
+    smsunits s ON l.unitId = s.unitId
+JOIN 
+    ladle_maintainance_history lm ON l.id = lm.ladleId
+JOIN 
+    user u ON lm.maintainedBy = u.id
+WHERE 
+    l.ladleId = 25
+    AND s.unitId = 'SMS 1'"""
+        },
+        {
+            "Question": "For unitId SMS 1, Tell me the history of ladle 25 for date 25 October, 2024?",
+            "Query": """SELECT 
+    lh.location AS Location,
+    lh.temperature AS Temperature,
+    lh.arrival_time AS 'Arrival Time',
+    lh.departure_time AS 'Departure Time'
+FROM 
+    ladles l
+JOIN 
+    ladle_history lh ON l.id = lh.ladleId
+JOIN 
+    smsunits su ON l.unitId = su.unitId
+WHERE 
+    l.ladleId = 25
+    AND su.unitId = 'SMS 1'
+    AND DATE(lh.arrival_time) = '2024-10-25';
+"""
+        }
+    ]
     return context
 
 def sql_query(sql, db: Session):
@@ -606,24 +598,55 @@ def sql_query(sql, db: Session):
         return {'columns': column_list, 'rows': row_final}
 
     except Exception as e:
-        print("Error yha hai",e)
         return {'message': "Error in executing the query!", 'error': str(e)}
 
 @app.post("/api/message")
 def message_endpoint(msg_req: MessageRequest, db: Session = Depends(get_db)):
     user_message = msg_req.message
-    # client_id = msg_req.clientId
     try:
         catalog = """\n
-        Table: ladle_history
-        Columns:\n
-        id int AI PK 
-        cameraId varchar(255) 
-        unitId varchar(255) 
-        ladleId varchar(255) 
-        timestamp datetime
+    __tablename__ = "smsunits" \n
+    Columns: \n
+    id, unitId
+
+\n
+    __tablename__ = "ladles" \n
+    Columns: \n
+    id, unitId, ladleId, grade, capacity, weight, temperature, timestamp
+
+\n
+    __tablename__ = "ladle_history" \n
+    Columns: \n
+    id, location, ladleId, temperature, arrival_time, departure_time
+
+\n
+    __tablename__ = "ladle_maintainance_history" \n
+    Columns: \n
+    id, ladleId, assigned_at, maintainedBy, delivered_at
+    
+\n
+    __tablename__ = "user" \n
+    Columns: \n
+    id, name, email, role
+    
+\n
+    __tablename__ = "camerafeeds" \n
+    Columns: \n
+    id, unitId, subunit, location, camera_url, state, ladleId, timestamp, last_detection
+    
+\n
+Some relationships helpful for writing join statements: \n
+- ladles.id = ladle_history.ladleId \n
+- ladles.id = ladle_maintainance_history.ladleId \n
+- ladles.id = camerafeeds.ladleId \n
+- ladle_maintainance_history.maintainedBy = user.id \n
+- smsunits.unitId = ladles.unitId \n
+- camerafeeds.unitId = smsunits.unitId \n
+\n
+Note: ladles.ladleId is actually ladle number and is not related to any other table.
+\n
         """
-        instructions = ''
+        instructions = ""
         system_prompt = (
             "You DO NOT write SQL queries for CREATE, UPDATE, DELETE operations. You ONLY give assistance for READ Sql queries operations. Only write queries with time frame constraints, using only the tables and columns that are required to solve the user's question. The queries you write will be executed on the database, so ensure they are complete and correct, don’t leave blank spaces for the user to fill in. Write complete sql queries."
             "\nALSO give a SHORT `Explanation` of the query and `Question` for which you have written."
@@ -652,7 +675,7 @@ def message_endpoint(msg_req: MessageRequest, db: Session = Depends(get_db)):
         context = get_context(user_message)
         filtered_context = ""
         for element in context:
-            filtered_context += f"Question: {element['Question']}\nExplanation: {element['Explanation']}\nQuery: {element['Query']}\n\n"
+            filtered_context += f"Question: {element['Question']}\nQuery: {element['Query']}\n\n"
 
         user_prompt = "\n"
         if len(filtered_context) > 0:
@@ -679,10 +702,7 @@ def message_endpoint(msg_req: MessageRequest, db: Session = Depends(get_db)):
                     }
                     return {'newMessage': new_message, 'message': "Response Received!"}
                 else:
-                    print(converted_result['Sql'])
                     data = sql_query(converted_result['Sql'], db)
-                    print(data)
-                    print(data['columns'], data['rows'])
                     if data.get('error'):
                         ai_msg.append({
                             'role': 'user',
@@ -711,9 +731,6 @@ def message_endpoint(msg_req: MessageRequest, db: Session = Depends(get_db)):
         }
         return {'newMessage': new_message, 'message': "Kindly re-write your question in more understandable words!"}
     except Exception as e:
-        # Print or log the error
-        print(f"Error in processing the request: {e}")
-        # Optionally include the error message in the HTTPException
         raise HTTPException(status_code=500, detail=f"Error in processing the request: {e}")
 
 

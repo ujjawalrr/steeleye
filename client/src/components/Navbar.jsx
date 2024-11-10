@@ -26,9 +26,14 @@ const Navbar = () => {
                         </>
                     }
                     {isAuthenticated ?
-                        <button onClick={() => logout()}>
-                            Logout
-                        </button>
+                        <>
+                            <NavLink to='/chat'>
+                                Chatbot
+                            </NavLink>
+                            <button onClick={() => logout()}>
+                                Logout
+                            </button>
+                        </>
                         :
                         <NavLink to='/login'>
                             Login
