@@ -207,6 +207,8 @@ def main():
     caps = [cv2.VideoCapture(url) for url in camera_urls]
     num_lists = [[] for _ in camera_urls]
     c = 1
+    # insert_number_into_db(cameras[0], 0)
+    
 
     while True:
         print(f'Frame {c}')
